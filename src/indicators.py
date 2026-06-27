@@ -23,28 +23,12 @@ def stochastic(df, k=14, d=3):
     return percent_k, percent_d
 
 
-def _cross(fast, slow):
-    """golden = fast ตัดขึ้นเหนือ slow, dead = ตัดลง, none = ไม่ตัด"""
-    s = fast.dropna().index.intersection(slow.dropna().index)
-    if len(s) < 2:
-        return "none"
-    f0, f1 = fast[s[-2]], fast[s[-1]]
-    s0, s1 = slow[s[-2]], slow[s[-1]]
-    if f0 <= s0 and f1 > s1:
-        return "golden"
-    if f0 >= s0 and f1 < s1:
-        return "dead"
-    return "none"
-
-
 def _timeframe_signals(df):
     r = rsi(df["Close"])
-    k, d = stochastic(df)
+    k, _ = stochastic(df)
     return {
         "rsi": round(float(r.dropna().iloc[-1]), 1) if r.notna().any() else None,
         "stoch_k": round(float(k.dropna().iloc[-1]), 1) if k.notna().any() else None,
-        "stoch_d": round(float(d.dropna().iloc[-1]), 1) if d.notna().any() else None,
-        "cross": _cross(k, d),
     }
 
 
