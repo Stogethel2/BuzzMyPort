@@ -1,0 +1,22 @@
+name: Daily Stock Report
+
+on:
+  schedule:
+    - cron: "30 0 * * 1-5"   # 00:30 UTC = 07:30 ICT, จ-ศ
+  workflow_dispatch: {}        # ปุ่มรันมือทดสอบ
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python main.py
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPORT_TO_EMAIL: ${{ secrets.REPORT_TO_EMAIL }}
+          REPORT_FROM_EMAIL: ${{ secrets.REPORT_FROM_EMAIL }}
