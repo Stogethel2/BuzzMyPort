@@ -1,6 +1,10 @@
 """ดึงข้อมูลจาก yfinance: ราคา/history/dividends ต่อ ticker + เรท USD->THB"""
+import logging
 import time
 import yfinance as yf
+
+# yfinance log HTTP 404 เองตอนหา calendar/XD ของ ETF ไม่เจอ — เราดักด้วย try/except อยู่แล้ว ปิด noise
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 
 def _retry(fn, attempts=3, base_delay=2):
