@@ -33,9 +33,32 @@ def report_dates(today):
     return [prev + timedelta(days=i) for i in range((today - prev).days)]
 
 
+MAX_TXN_LAG_DAYS = 7  # ตัดรายการที่ "วันทำรายการ" เก่ากว่า "วันรับเอกสาร" เกินนี้ (กฎต้องรายงานใน 3 วันทำการ — เก่ากว่านี้มักเป็น typo)
+
+
 def _to_be(d):
     """date -> 'dd/mm/yyyy' แบบ พ.ศ. (รูปแบบที่ฟอร์มต้องการ)"""
     return f"{d.day:02d}/{d.month:02d}/{d.year + BE_OFFSET}"
+
+
+def _from_be(s):
+    """'15/02/2569' (พ.ศ.) -> date ; คืน None ถ้า format ไม่ตรง"""
+    try:
+        d, m, y = s.strip().split("/")
+        return date(int(y) - BE_OFFSET, int(m), int(d))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _txn_is_recent(txn_be, recv_iso, max_lag=MAX_TXN_LAG_DAYS):
+    """วันทำรายการต้องไม่เก่ากว่าวันรับเอกสารเกิน max_lag (กัน filing ที่กรอกปีผิด เช่น 2555)
+
+    parse ไม่ได้ -> ถือว่าผ่าน (ไม่ตัดทิ้งเพราะ format แปลก)
+    """
+    txn = _from_be(txn_be)
+    if txn is None:
+        return True
+    return 0 <= (date.fromisoformat(recv_iso) - txn).days <= max_lag
 
 
 def _num(s):
@@ -192,7 +215,7 @@ def fetch_filings(symbols, today=None):
             if over_cap:
                 failed.append(f"{path} {d.isoformat()} (>100 แถว ดูไม่ครบ)")
             for row in rows:
-                if row["symbol"] in want:
+                if row["symbol"] in want and _txn_is_recent(row["txn_date"], row["recv_date"]):
                     by_id[row["filing_id"]] = row
 
     rows = sorted(by_id.values(), key=lambda r: (r["recv_date"], r["symbol"] or ""), reverse=True)

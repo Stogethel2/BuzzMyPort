@@ -74,6 +74,18 @@ def test_report_dates_window():
     assert [d.isoformat() for d in sat] == ["2026-07-03"]
 
 
+def test_txn_recency_filter():
+    # filing ที่กรอกวันทำรายการเก่ากว่าวันรับเอกสารมาก (เช่น KBANK 2555) ต้องถูกตัด
+    assert sec_filings._txn_is_recent("15/02/2555", "2026-06-27") is False
+    # รายการปกติ: ทำรายการก่อนรับเอกสารไม่กี่วัน -> ผ่าน
+    assert sec_filings._txn_is_recent("25/06/2569", "2026-06-27") is True
+    assert sec_filings._txn_is_recent("27/06/2569", "2026-06-27") is True  # วันเดียวกัน
+    # เกิน 7 วันพอดี -> ตัด
+    assert sec_filings._txn_is_recent("19/06/2569", "2026-06-27") is False
+    # parse ไม่ได้ -> ไม่ตัดทิ้ง
+    assert sec_filings._txn_is_recent("", "2026-06-27") is True
+
+
 def test_num():
     assert sec_filings._num("95,400") == 95400.0
     assert sec_filings._num("-") is None
