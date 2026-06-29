@@ -18,6 +18,19 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
 HIDDEN = ("__VIEWSTATE", "__VIEWSTATEGENERATOR", "__EVENTVALIDATION")
 BE_OFFSET = 543  # พ.ศ. = ค.ศ. + 543
 SYMBOL_RE = re.compile(r"\(([A-Z0-9]+)\)\s*$")  # ...บมจ.(GTB)
+RUN_WEEKDAYS = (1, 2, 3, 4, 5)  # วันที่ cron ส่งเมล: อังคาร-เสาร์ (จันทร์=0)
+
+
+def report_dates(today):
+    """วัน 'รับเอกสาร' ที่เมลฉบับนี้ต้องครอบ = ตั้งแต่เมลฉบับก่อน(วันรันตามตาราง)ถึงเมื่อวาน
+
+    เมลฉบับก่อนครอบถึง 'เมื่อวานของมัน' แล้ว → ฉบับนี้เริ่มที่วันรันก่อนหน้าพอดี ไม่ซ้ำไม่ขาด
+    เช่น อังคาร → [เสาร์, อาทิตย์, จันทร์] ; พุธ-เสาร์ → [เมื่อวาน] วันเดียว
+    """
+    prev = today - timedelta(days=1)
+    while prev.weekday() not in RUN_WEEKDAYS:
+        prev -= timedelta(days=1)
+    return [prev + timedelta(days=i) for i in range((today - prev).days)]
 
 
 def _to_be(d):
@@ -153,8 +166,8 @@ def _fetch_day(session, path, base_fields, parser, d):
     return rows, over_cap
 
 
-def fetch_filings(symbols, days=7, today=None):
-    """ดึงแบบ 59 + 246-2 ราย "วันรับเอกสาร" ย้อนหลัง `days` วัน แล้วกรองเฉพาะ symbols
+def fetch_filings(symbols, today=None):
+    """ดึงแบบ 59 + 246-2 ตาม "วันรับเอกสาร" ที่เมลฉบับนี้ต้องครอบ (ดู report_dates) แล้วกรองเฉพาะ symbols
 
     คืน (rows, failed):
       rows   = list[Filing dict] กรองด้วย symbols, dedupe ด้วย filing_id, เรียง recv_date ใหม่→เก่า
@@ -169,8 +182,7 @@ def fetch_filings(symbols, days=7, today=None):
 
     by_id, failed = {}, []
     forms = [("r59", _FORM59_FIELDS, _parse_form59), ("r246", _FORM246_FIELDS, _parse_form246)]
-    for offset in range(days):
-        d = today - timedelta(days=offset)
+    for d in report_dates(today):
         for path, base_fields, parser in forms:
             try:
                 rows, over_cap = _fetch_day(session, path, base_fields, parser, d)

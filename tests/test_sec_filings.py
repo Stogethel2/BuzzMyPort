@@ -61,6 +61,19 @@ def test_to_be_date():
     assert sec_filings._to_be(date(2026, 6, 24)) == "24/06/2569"
 
 
+def test_report_dates_window():
+    from datetime import date
+    # 2026-06-30 = อังคาร -> ครอบ เสาร์ 27, อาทิตย์ 28, จันทร์ 29 (ตั้งแต่เมลครั้งก่อน=เสาร์)
+    tue = sec_filings.report_dates(date(2026, 6, 30))
+    assert [d.isoformat() for d in tue] == ["2026-06-27", "2026-06-28", "2026-06-29"]
+    # 2026-07-01 = พุธ -> เมื่อวานวันเดียว (อังคาร 30)
+    wed = sec_filings.report_dates(date(2026, 7, 1))
+    assert [d.isoformat() for d in wed] == ["2026-06-30"]
+    # 2026-07-04 = เสาร์ -> เมื่อวานวันเดียว (ศุกร์ 3)
+    sat = sec_filings.report_dates(date(2026, 7, 4))
+    assert [d.isoformat() for d in sat] == ["2026-07-03"]
+
+
 def test_num():
     assert sec_filings._num("95,400") == 95400.0
     assert sec_filings._num("-") is None

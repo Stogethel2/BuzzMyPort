@@ -65,7 +65,7 @@ _TEMPLATE = Template("""\
   {% endif %}
 
   <h3 style="margin:24px 0 4px">🏛️ ความเคลื่อนไหวผู้บริหาร/ผู้ถือหุ้นใหญ่</h3>
-  <div style="color:#666;font-size:12px;margin-bottom:10px">แบบ 59 / 246-2 — ที่ ก.ล.ต. รับเอกสารล่าสุด 7 วัน</div>
+  <div style="color:#666;font-size:12px;margin-bottom:10px">แบบ 59 / 246-2 — ที่ ก.ล.ต. รับเอกสาร{% if sec_period %} {{ sec_period }}{% endif %}</div>
 
   {% if sec_failed %}
   <div style="background:#fff3cd;color:#856404;border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:10px">
@@ -77,7 +77,7 @@ _TEMPLATE = Template("""\
   {% set f246 = insider_rows|selectattr("form","equalto","246")|list %}
 
   {% if not insider_rows %}
-  <div style="color:#888;font-size:13px;padding:8px 0">ไม่มีรายงานใหม่ในช่วง 7 วัน</div>
+  <div style="color:#888;font-size:13px;padding:8px 0">ไม่มีรายงานใหม่</div>
   {% endif %}
 
   {% if f59 %}
@@ -142,6 +142,7 @@ def _act_color(action):
 _TEMPLATE.globals["act_color"] = _act_color
 
 
-def render(asof, totals, rows, failed, insider_rows=None, sec_failed=None):
+def render(asof, totals, rows, failed, insider_rows=None, sec_failed=None, sec_period=""):
     return _TEMPLATE.render(asof=asof, totals=totals, rows=rows, failed=failed,
-                            insider_rows=insider_rows or [], sec_failed=sec_failed or [])
+                            insider_rows=insider_rows or [], sec_failed=sec_failed or [],
+                            sec_period=sec_period)

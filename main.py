@@ -15,7 +15,14 @@ from src import data_fetcher, indicators, pnl, report, email_sender, sec_filings
 CONFIG_PATH = Path(__file__).parent / "config" / "portfolio.json"
 TZ = ZoneInfo("Asia/Bangkok")
 XD_WINDOW_DAYS = 14
-SEC_WINDOW_DAYS = 7  # ดูแบบ 59/246-2 ที่ ก.ล.ต. รับเอกสารย้อนหลังกี่วัน
+
+
+def _sec_period_label(dates):
+    """ป้ายช่วง 'วันรับเอกสาร' ในเมล เป็น พ.ศ. — วันเดียวหรือช่วง"""
+    if not dates:
+        return ""
+    fmt = lambda d: f"{d.day:02d}/{d.month:02d}/{d.year + 543}"
+    return fmt(dates[0]) if len(dates) == 1 else f"{fmt(dates[0])}–{fmt(dates[-1])}"
 
 
 def _xd_days(ticker):
@@ -49,12 +56,13 @@ def build():
 
     totals = pnl.portfolio_totals(rows, usdthb)
 
+    today = datetime.now(TZ).date()
     thai_symbols = [h["ticker"][:-3] for h in holdings if h["ticker"].endswith(".BK")]
-    insider_rows, sec_failed = sec_filings.fetch_filings(
-        thai_symbols, days=SEC_WINDOW_DAYS, today=datetime.now(TZ).date())
+    insider_rows, sec_failed = sec_filings.fetch_filings(thai_symbols, today=today)
+    sec_period = _sec_period_label(sec_filings.report_dates(today))
 
     asof = datetime.now(TZ).strftime("%d/%m/%Y %H:%M")
-    html = report.render(asof, totals, rows, failed, insider_rows, sec_failed)
+    html = report.render(asof, totals, rows, failed, insider_rows, sec_failed, sec_period)
     partial = "⚠️ " if (failed or not totals["fx_ok"]) else ""
     subject = f"📊 {partial}พอร์ต ฿{totals['total_value']:,.0f} ({totals['total_pl_pct']:+.1f}%) — {asof}"
     return html, subject

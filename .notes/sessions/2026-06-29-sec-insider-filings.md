@@ -7,15 +7,15 @@
 - `.github/workflows/daily-report.yml`: cron `30 0 * * 1-5` → `30 0 * * 2-6` (อ–ส, เวลาเดิม)
 - `src/sec_filings.py` (ใหม่): scraper แบบ 59 + 246-2 จาก market.sec.or.th iDisc
 - `src/report.py`: section ใหม่ "ความเคลื่อนไหวผู้บริหาร/ผู้ถือหุ้นใหญ่" (คอลัมน์ต่างกันต่อฟอร์ม) + failure notice
-- `main.py`: ดึง thai_symbols (.BK) → `fetch_filings(days=7)` → ส่งเข้า report
+- `main.py`: ดึง thai_symbols (.BK) → `fetch_filings(today=...)` → ส่งเข้า report
 - `requirements.txt`: + requests, beautifulsoup4
 - `tests/test_sec_filings.py` + fixtures HTML จริง (5 เทสต์ผ่าน)
 
 ## Decisions (ที่พิสูจน์จาก spike จริง)
 - iDisc = **ASP.NET WebForms** (postback HTML + ViewState ~151KB) ไม่ใช่ JSON/Angular → requests+bs4
-- **global query** (company ว่าง) ราย "วันรับเอกสาร" (`rblDateType=2`) ทีละวัน 7 วัน → เลี่ยง page cap 100 แถว + **ไม่ต้อง map symbol→company-id** (symbol อยู่ในผลลัพธ์: 59 = `บมจ.(SYM)`, 246 = คอลัมน์แรก)
+- **global query** (company ว่าง) ราย "วันรับเอกสาร" (`rblDateType=2`) ทีละวัน → เลี่ยง page cap 100 แถว + **ไม่ต้อง map symbol→company-id** (symbol อยู่ในผลลัพธ์: 59 = `บมจ.(SYM)`, 246 = คอลัมน์แรก)
 - 246-2 ไม่มีราคา/จำนวน → แสดง **% การถือครอง** แทน (คนละ schema กับ 59)
-- stateless: window 7 วัน + dedupe ด้วย filing_id (59=batchNo/transId, 246=เลขที่รายงาน), label "ล่าสุด 7 วัน"
+- stateless: window "ตั้งแต่เมลฉบับก่อนถึงเมื่อวาน" (`report_dates`, อิงตาราง อ-ส, กันตกหล่นสุดสัปดาห์) + dedupe ด้วย filing_id (59=batchNo/transId, 246=เลขที่รายงาน), label โชว์ช่วงวันที่จริง
 - graceful: error/วันทะลุ cap → เข้า `sec_failed` → failure notice ในเมล เมลยังส่งปกติ
 
 ## Verified
