@@ -3,7 +3,7 @@ from jinja2 import Template
 
 _TEMPLATE = Template("""\
 {% macro c(v, ob, os_) %}{% if v is none %}-{% elif v >= ob %}<span style="background:#e53935;color:#fff;border-radius:5px;padding:2px 7px;font-weight:700">{{ "%.0f"|format(v) }}</span>{% elif v <= os_ %}<span style="background:#22c55e;color:#fff;border-radius:5px;padding:2px 7px;font-weight:700">{{ "%.0f"|format(v) }}</span>{% else %}<span style="color:#888">{{ "%.0f"|format(v) }}</span>{% endif %}{% endmacro %}
-{% macro stoch(s) %}{{ c(s.stoch_k, 80, 20) }}/{{ c(s.stoch_d, 80, 20) }}{% if s.stoch_cross == "up" %} <span style="color:#1e8e3e;font-weight:700">↑</span>{% elif s.stoch_cross == "down" %} <span style="color:#c0392b;font-weight:700">↓</span>{% endif %}{% endmacro %}
+{% macro stoch_line(label, s) %}{% if s.stoch_k is none or s.stoch_d is none %}<div><span style="color:#777">{{ label }}</span> -</div>{% else %}{% set bull = s.stoch_k > s.stoch_d %}{% set bear = s.stoch_k < s.stoch_d %}<div style="white-space:nowrap"><span style="color:#777">{{ label }}</span> <span style="color:{{ '#1e8e3e' if bull else '#c0392b' if bear else '#888' }};font-weight:700">{{ 'Bull' if bull else 'Bear' if bear else 'Flat' }}{% if s.stoch_cross == "up" %} ↑{% elif s.stoch_cross == "down" %} ↓{% endif %}</span> <span style="color:#777">K {{ "%.0f"|format(s.stoch_k) }} / D {{ "%.0f"|format(s.stoch_d) }}</span></div>{% endif %}{% endmacro %}
 <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:680px;margin:auto;color:#1a1a1a">
   <h2 style="margin-bottom:4px">📊 มูลค่าพอร์ตรวม</h2>
   <div style="color:#666;font-size:13px;margin-bottom:12px">{{ asof }}</div>
@@ -38,7 +38,7 @@ _TEMPLATE = Template("""\
         <th style="padding:6px 4px">หุ้น</th>
         <th style="padding:6px 4px;text-align:right">ราคา</th>
         <th style="padding:6px 4px;text-align:right">P/L</th>
-        <th style="padding:6px 4px">Stoch K/D(1D/1W)</th>
+        <th style="padding:6px 4px">Stoch</th>
         <th style="padding:6px 4px">RSI(1D/1W)</th>
       </tr>
     </thead>
@@ -52,7 +52,7 @@ _TEMPLATE = Template("""\
         <td style="padding:6px 4px;text-align:right;color:{{ '#1e8e3e' if r.pl >= 0 else '#c0392b' }}">
           {{ '+' if r.pl >= 0 else '' }}{{ "%.1f"|format(r.pl_pct) }}%
         </td>
-        <td style="padding:6px 4px">{{ stoch(r.signals.d1) }} / {{ stoch(r.signals.w1) }}</td>
+        <td style="padding:6px 4px">{{ stoch_line("1D", r.signals.d1) }}{{ stoch_line("1W", r.signals.w1) }}</td>
         <td style="padding:6px 4px">{{ c(r.signals.d1.rsi, 70, 30) }} / {{ c(r.signals.w1.rsi, 70, 30) }}</td>
       </tr>
     {% endfor %}
