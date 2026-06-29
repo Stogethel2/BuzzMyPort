@@ -63,9 +63,85 @@ _TEMPLATE = Template("""\
     ⚠️ ดึงข้อมูลไม่ได้: {{ failed|join(", ") }}
   </div>
   {% endif %}
+
+  <h3 style="margin:24px 0 4px">🏛️ ความเคลื่อนไหวผู้บริหาร/ผู้ถือหุ้นใหญ่</h3>
+  <div style="color:#666;font-size:12px;margin-bottom:10px">แบบ 59 / 246-2 — ที่ ก.ล.ต. รับเอกสารล่าสุด 7 วัน</div>
+
+  {% if sec_failed %}
+  <div style="background:#fff3cd;color:#856404;border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:10px">
+    ⚠️ ดึงข้อมูล ก.ล.ต. ไม่สำเร็จบางส่วน: {{ sec_failed|join(", ") }}
+  </div>
+  {% endif %}
+
+  {% set f59 = insider_rows|selectattr("form","equalto","59")|list %}
+  {% set f246 = insider_rows|selectattr("form","equalto","246")|list %}
+
+  {% if not insider_rows %}
+  <div style="color:#888;font-size:13px;padding:8px 0">ไม่มีรายงานใหม่ในช่วง 7 วัน</div>
+  {% endif %}
+
+  {% if f59 %}
+  <div style="font-size:12px;font-weight:600;color:#555;margin:8px 0 4px">กรรมการ/ผู้บริหาร (แบบ 59)</div>
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="text-align:left;color:#666;border-bottom:2px solid #eee">
+      <th style="padding:5px 4px">หุ้น</th><th style="padding:5px 4px">ชื่อ</th>
+      <th style="padding:5px 4px">รายการ</th><th style="padding:5px 4px;text-align:right">จำนวน</th>
+      <th style="padding:5px 4px;text-align:right">ราคา</th><th style="padding:5px 4px">วันที่</th>
+    </tr></thead>
+    <tbody>
+    {% for r in f59 %}
+      <tr style="border-bottom:1px solid #f0f0f0">
+        <td style="padding:5px 4px;font-weight:600">{% if r.source_url %}<a href="{{ r.source_url }}" style="color:#1a1a1a;text-decoration:none">{{ r.symbol }}</a>{% else %}{{ r.symbol }}{% endif %}</td>
+        <td style="padding:5px 4px">{{ r.name }}</td>
+        <td style="padding:5px 4px;font-weight:600;color:{{ act_color(r.action) }}">{{ r.action }}</td>
+        <td style="padding:5px 4px;text-align:right">{{ "{:,.0f}".format(r.shares) if r.shares is not none else "-" }}</td>
+        <td style="padding:5px 4px;text-align:right">{{ "%.2f"|format(r.price) if r.price is not none else "-" }}</td>
+        <td style="padding:5px 4px;white-space:nowrap">{{ r.txn_date }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if f246 %}
+  <div style="font-size:12px;font-weight:600;color:#555;margin:14px 0 4px">ผู้ถือหุ้นใหญ่ (แบบ 246-2 — % การถือครอง)</div>
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="text-align:left;color:#666;border-bottom:2px solid #eee">
+      <th style="padding:5px 4px">หุ้น</th><th style="padding:5px 4px">ชื่อ</th>
+      <th style="padding:5px 4px">รายการ</th><th style="padding:5px 4px;text-align:right">% เปลี่ยน</th>
+      <th style="padding:5px 4px;text-align:right">% หลัง</th><th style="padding:5px 4px">วันที่</th>
+    </tr></thead>
+    <tbody>
+    {% for r in f246 %}
+      <tr style="border-bottom:1px solid #f0f0f0">
+        <td style="padding:5px 4px;font-weight:600">{{ r.symbol }}</td>
+        <td style="padding:5px 4px">{{ r.name }}</td>
+        <td style="padding:5px 4px;font-weight:600;color:{{ act_color(r.action) }}">{{ r.action }}</td>
+        <td style="padding:5px 4px;text-align:right">{{ "%.2f"|format(r.pct_change) if r.pct_change is not none else "-" }}</td>
+        <td style="padding:5px 4px;text-align:right">{{ "%.2f"|format(r.pct_after) if r.pct_after is not none else "-" }}</td>
+        <td style="padding:5px 4px;white-space:nowrap">{{ r.txn_date }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
 </div>
 """)
 
 
-def render(asof, totals, rows, failed):
-    return _TEMPLATE.render(asof=asof, totals=totals, rows=rows, failed=failed)
+def _act_color(action):
+    """ซื้อ/ได้มา = เขียว, ขาย/จำหน่าย = แดง, อื่นๆ (โอน/สิ้นสุด) = เทา"""
+    a = action or ""
+    if "ซื้อ" in a or "ได้มา" in a:
+        return "#1e8e3e"
+    if "ขาย" in a or "จำหน่าย" in a:
+        return "#c0392b"
+    return "#888"
+
+
+_TEMPLATE.globals["act_color"] = _act_color
+
+
+def render(asof, totals, rows, failed, insider_rows=None, sec_failed=None):
+    return _TEMPLATE.render(asof=asof, totals=totals, rows=rows, failed=failed,
+                            insider_rows=insider_rows or [], sec_failed=sec_failed or [])

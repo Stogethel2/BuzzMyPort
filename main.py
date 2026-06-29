@@ -10,11 +10,12 @@ from datetime import datetime, date
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from src import data_fetcher, indicators, pnl, report, email_sender
+from src import data_fetcher, indicators, pnl, report, email_sender, sec_filings
 
 CONFIG_PATH = Path(__file__).parent / "config" / "portfolio.json"
 TZ = ZoneInfo("Asia/Bangkok")
 XD_WINDOW_DAYS = 14
+SEC_WINDOW_DAYS = 7  # ดูแบบ 59/246-2 ที่ ก.ล.ต. รับเอกสารย้อนหลังกี่วัน
 
 
 def _xd_days(ticker):
@@ -47,8 +48,13 @@ def build():
         rows.append(row)
 
     totals = pnl.portfolio_totals(rows, usdthb)
+
+    thai_symbols = [h["ticker"][:-3] for h in holdings if h["ticker"].endswith(".BK")]
+    insider_rows, sec_failed = sec_filings.fetch_filings(
+        thai_symbols, days=SEC_WINDOW_DAYS, today=datetime.now(TZ).date())
+
     asof = datetime.now(TZ).strftime("%d/%m/%Y %H:%M")
-    html = report.render(asof, totals, rows, failed)
+    html = report.render(asof, totals, rows, failed, insider_rows, sec_failed)
     partial = "⚠️ " if (failed or not totals["fx_ok"]) else ""
     subject = f"📊 {partial}พอร์ต ฿{totals['total_value']:,.0f} ({totals['total_pl_pct']:+.1f}%) — {asof}"
     return html, subject
