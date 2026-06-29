@@ -9,10 +9,10 @@
 
 ## การตัดสินใจ (ยืนยันกับ PO แล้ว)
 - ข้อมูล: **แบบ 59** (กรรมการ/ผู้บริหาร) **+ แบบ 246-2** (ผู้ถือหุ้นใหญ่ ข้าม/ลดเกณฑ์ 5%)
-- ช่วงเวลา: **"ตั้งแต่เมลฉบับก่อนถึงเมื่อวาน"** (อิงตาราง cron อ-ส) — `report_dates()`: อังคารครอบ เสาร์+อาทิตย์+จันทร์ (กันตกหล่นช่วงสุดสัปดาห์), พุธ-เสาร์ = เมื่อวานวันเดียว ; label ในเมลโชว์ช่วงวันที่จริง (พ.ศ.) ไม่ขาดไม่ซ้ำ (PO เลือกเอง 2026-06-29)
+- ช่วงเวลา: **ตั้งแต่เมลรอบก่อนถึงเมื่อวาน** ตาม cron อังคาร-เสาร์ — อังคารครอบเสาร์-จันทร์, พุธ-เสาร์ครอบเมื่อวานวันเดียว; ไม่แสดง filing เก่าซ้ำทุกวัน
 - ขอบเขต: **หุ้น/กองทุนไทย (.BK) เท่านั้น** — ข้าม QQQM (US)
 - **ตัด filing ที่วันทำรายการเก่ากว่าวันรับเอกสาร >7 วัน** (`_txn_is_recent`, `MAX_TXN_LAG_DAYS=7`) — กัน filer กรอกปีผิด (เคสจริง KBANK กรอก 2555/2012) ; คงตารางสะอาด ไม่เพิ่มคอลัมน์วันรับเอกสาร (PO ขอไม่ให้รก)
-- **ถ้า scrape ไม่สำเร็จ → แนบ notice ในเมลรายวัน** (บอกว่าฟอร์ม/หุ้นไหนดึงไม่ได้) ไม่ใช่เงียบหาย
+- **ถ้า scrape ไม่สำเร็จ → แนบ notice ในเมลรายวัน** (บอกว่าฟอร์ม/หุ้นไหนดึงไม่ได้) ไม่ใช่เงียบหาย; notice จำกัดตัวอย่างรายการแรก ๆ เพื่อไม่ให้รกเมื่อเกิดหลายวัน
 
 ---
 
@@ -35,10 +35,10 @@
 ### ✅ B1 พิสูจน์แล้ว (spike จริงด้วย requests+bs4 — gate ผ่าน)
 **ไม่ใช่ JSON API / ไม่ใช่ Angular — เป็น ASP.NET WebForms (postback HTML + ViewState)**
 - Flow ต่อฟอร์ม: GET หน้า → ดึง hidden `__VIEWSTATE`(~151KB)/`__VIEWSTATEGENERATOR`/`__EVENTVALIDATION` → POST กลับ URL เดิม → ได้ HTML ตาราง → parse ด้วย bs4
-- **global query ได้** (ปล่อย company ว่าง) → **ไม่ต้อง map symbol→company-id เลย** (สำคัญมาก แก้ข้อกังวล Codex)
-- **page cap 100 แถว/response** (เช่น 29 วัน = 686 จริง แต่ส่งมา 100) → **เลี่ยงด้วยการ query ราย "วันรับเอกสาร" ทีละวัน** (received-date ≈ 14–41 แถว/วัน << 100) → ไม่ต้องทำ pagination
+- **global query ได้** (ปล่อย company ว่าง) ราย "วันรับเอกสาร" (`rblDateType=2`) ทีละวัน → เก็บ `recv_date` ถูกต้องสำหรับ window รอบเมล
+- **page cap 100 แถว/response** ยังเกิดได้ในบางวัน (เช่น 05/06/2026 แบบ 59 >100 รายการ) → fallback ไป query รายบริษัทด้วย static `FORM59_COMPANY_IDS` ของหุ้นในพอร์ต แล้วไม่ขึ้น warning ถ้า fallback สำเร็จ; แบบ 246-2 volume ต่ำ จึงยังใช้ global รายวันและเตือนถ้าเกิน cap
 - ใช้ received/published = **`rblDateType=2`** (r59 = "วันที่ สนง.รับเอกสาร", r246 = "วันที่เผยแพร่") — ⚠️ ค่า `1` คือ transaction date อย่าใช้
-- safety: ถ้า count(พบ X) > แถวที่ parse ได้ → วันนั้นทะลุ cap 100 → **ใส่ใน `sec_failed`/failure-notice** (per-day คือ granularity ละเอียดสุดของ UI ซอยต่อไม่ได้ — เป็น edge case ที่แค่เตือน)
+- safety: ถ้า count(พบ X) > แถวที่ parse ได้ในแบบ 59 → fallback รายบริษัทก่อน; ใส่ `sec_failed` เฉพาะ fallback fail หรือแบบ 246-2 เกิน cap
 
 **แบบ 59** `https://market.sec.or.th/public/idisc/th/r59`
 - fields: `ctl00$CPH$ddlCompany`(ว่าง), `ctl00$CPH$rblDateType`(=2), `ctl00$CPH$BSDateFrom/To`(พ.ศ. dd/mm/yyyy), `ctl00$CPH$btSearch`(=ค้นหา)
@@ -57,13 +57,13 @@
    - helper `_post(url, fields)`: GET → ดึง 3 hidden fields → POST → คืน soup (retry 3 ครั้งแบบ `_retry`)
    - `fetch_form59(date_th) -> list[Filing]`: POST r59 (company ว่าง, rblDateType=1, from=to=date) → parse ตาราง (หา table ที่มี "ความสัมพันธ์")
    - `fetch_form246(date_th) -> list[Filing]`: POST r246 (BsCompany ว่าง, rblDateType=1) → parse
-   - วนเรียกตาม `report_dates(today)` = ตั้งแต่วันรัน cron ก่อนหน้า ถึงเมื่อวาน (อังคาร=เสาร์-จันทร์, วันอื่น=เมื่อวาน)
+   - วนเรียกตาม `report_dates(today)` = ตั้งแต่เมลรอบก่อนถึงเมื่อวาน
    - `Filing` (รวม 2 schema): `form, symbol, name, relationship, action, shares, price, pct_change, pct_after, txn_date, recv_date, source_url, filing_id`
      - 59 เติม shares/price; 246 เติม pct_change/pct_after (อีกฝั่งเว้น None)
    - symbol: 59 = regex `\(([A-Z0-9]+)\)\s*$` จากชื่อบริษัท; 246 = คอลัมน์แรกตรงๆ
    - filing_id: 59 = batchNo+transId+reporter (จาก detail href); 246 = symbol+name+recv_date (ไม่มี id ชัด)
    - แปลง **พ.ศ.→ค.ศ. (ปี−543)**, parse จำนวน (ตัด comma), ราคา `-`→None
-   - safety: ถ้า "พบ X" > จำนวนแถว → บันทึก warning (วันนั้นทะลุ cap 100)
+- safety: ถ้า "พบ X" > จำนวนแถวของแบบ 59 → query รายบริษัทของหุ้นในพอร์ตเพื่อเติมแถวที่อาจตก cap; บันทึก warning เฉพาะกรณี fallback query fail
    - graceful: error ต่อวัน/ต่อฟอร์ม ไม่ทำทั้งงานล้ม → เก็บใน failed
 
 2. **กรอง + รวม** — เก็บเฉพาะ symbol ที่อยู่ใน watchlist (`config/portfolio.json`, ตัด `.BK`, ข้าม QQQM), dedupe ด้วย filing_id, เรียง recv_date ใหม่→เก่า

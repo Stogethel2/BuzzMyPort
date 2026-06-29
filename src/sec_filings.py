@@ -19,14 +19,24 @@ HIDDEN = ("__VIEWSTATE", "__VIEWSTATEGENERATOR", "__EVENTVALIDATION")
 BE_OFFSET = 543  # พ.ศ. = ค.ศ. + 543
 SYMBOL_RE = re.compile(r"\(([A-Z0-9]+)\)\s*$")  # ...บมจ.(GTB)
 RUN_WEEKDAYS = (1, 2, 3, 4, 5)  # วันที่ cron ส่งเมล: อังคาร-เสาร์ (จันทร์=0)
+R59_GLOBAL_ATTEMPTS = 2
+FORM59_COMPANY_IDS = {
+    "KBANK": "0000000022",
+    "AP": "0000000421",
+    "SIRI": "0000001322",
+    "TCAP": "0000000275",
+    "TISCO": "0000006887",
+    "SCB": "0000033250",
+    "UVAN": "0000002432",
+    "PTT": "0000001074",
+    "TU": "0000001119",
+    "CPNREIT": "0000027075",
+    "TASCO": "0000000187",
+}
 
 
 def report_dates(today):
-    """วัน 'รับเอกสาร' ที่เมลฉบับนี้ต้องครอบ = ตั้งแต่เมลฉบับก่อน(วันรันตามตาราง)ถึงเมื่อวาน
-
-    เมลฉบับก่อนครอบถึง 'เมื่อวานของมัน' แล้ว → ฉบับนี้เริ่มที่วันรันก่อนหน้าพอดี ไม่ซ้ำไม่ขาด
-    เช่น อังคาร → [เสาร์, อาทิตย์, จันทร์] ; พุธ-เสาร์ → [เมื่อวาน] วันเดียว
-    """
+    """วัน 'รับเอกสาร' ที่เมลครอบ = ตั้งแต่เมลรอบก่อนถึงเมื่อวาน เรียงเก่า→ใหม่"""
     prev = today - timedelta(days=1)
     while prev.weekday() not in RUN_WEEKDAYS:
         prev -= timedelta(days=1)
@@ -189,6 +199,23 @@ def _fetch_day(session, path, base_fields, parser, d):
     return rows, over_cap
 
 
+def _fetch_form59_company_day(session, symbol, d):
+    fields = dict(_FORM59_FIELDS)
+    fields["ctl00$CPH$ddlCompany"] = FORM59_COMPANY_IDS[symbol]
+    return _fetch_day(session, "r59", fields, _parse_form59, d)
+
+
+def _fetch_form59_global_day(session, d):
+    by_id = {}
+    over_cap = False
+    for _ in range(R59_GLOBAL_ATTEMPTS):
+        rows, attempt_over_cap = _fetch_day(session, "r59", _FORM59_FIELDS, _parse_form59, d)
+        over_cap = over_cap or attempt_over_cap
+        for row in rows:
+            by_id[row["filing_id"]] = row
+    return list(by_id.values()), over_cap
+
+
 def fetch_filings(symbols, today=None):
     """ดึงแบบ 59 + 246-2 ตาม "วันรับเอกสาร" ที่เมลฉบับนี้ต้องครอบ (ดู report_dates) แล้วกรองเฉพาะ symbols
 
@@ -196,7 +223,8 @@ def fetch_filings(symbols, today=None):
       rows   = list[Filing dict] กรองด้วย symbols, dedupe ด้วย filing_id, เรียง recv_date ใหม่→เก่า
       failed = list[str] อธิบายวัน/ฟอร์มที่ดึงไม่ได้ หรือวันที่ทะลุ cap 100 (ไว้ทำ failure notice)
     """
-    want = {s.upper() for s in symbols}
+    ordered_want = list(dict.fromkeys(s.upper() for s in symbols))
+    want = set(ordered_want)
     if not want:  # ไม่มีหุ้นไทย -> ไม่ต้องยิงเว็บ ก.ล.ต.
         return [], []
     today = today or date.today()
@@ -208,12 +236,26 @@ def fetch_filings(symbols, today=None):
     for d in report_dates(today):
         for path, base_fields, parser in forms:
             try:
-                rows, over_cap = _fetch_day(session, path, base_fields, parser, d)
+                if path == "r59":
+                    rows, over_cap = _fetch_form59_global_day(session, d)
+                else:
+                    rows, over_cap = _fetch_day(session, path, base_fields, parser, d)
             except Exception:
                 failed.append(f"{path} {d.isoformat()}")
                 continue
             if over_cap:
-                failed.append(f"{path} {d.isoformat()} (>100 แถว ดูไม่ครบ)")
+                if path == "r59":
+                    for symbol in ordered_want:
+                        if symbol not in FORM59_COMPANY_IDS:
+                            continue
+                        try:
+                            company_rows, _ = _fetch_form59_company_day(session, symbol, d)
+                        except Exception:
+                            failed.append(f"r59 {symbol} {d.isoformat()}")
+                            continue
+                        rows.extend(company_rows)
+                else:
+                    failed.append(f"{path} {d.isoformat()} (>100 แถว ดูไม่ครบ)")
             for row in rows:
                 if row["symbol"] in want and _txn_is_recent(row["txn_date"], row["recv_date"]):
                     by_id[row["filing_id"]] = row

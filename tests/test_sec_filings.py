@@ -63,13 +63,12 @@ def test_to_be_date():
 
 def test_report_dates_window():
     from datetime import date
-    # 2026-06-30 = อังคาร -> ครอบ เสาร์ 27, อาทิตย์ 28, จันทร์ 29 (ตั้งแต่เมลครั้งก่อน=เสาร์)
     tue = sec_filings.report_dates(date(2026, 6, 30))
     assert [d.isoformat() for d in tue] == ["2026-06-27", "2026-06-28", "2026-06-29"]
-    # 2026-07-01 = พุธ -> เมื่อวานวันเดียว (อังคาร 30)
+
     wed = sec_filings.report_dates(date(2026, 7, 1))
     assert [d.isoformat() for d in wed] == ["2026-06-30"]
-    # 2026-07-04 = เสาร์ -> เมื่อวานวันเดียว (ศุกร์ 3)
+
     sat = sec_filings.report_dates(date(2026, 7, 4))
     assert [d.isoformat() for d in sat] == ["2026-07-03"]
 
@@ -84,6 +83,88 @@ def test_txn_recency_filter():
     assert sec_filings._txn_is_recent("19/06/2569", "2026-06-27") is False
     # parse ไม่ได้ -> ไม่ตัดทิ้ง
     assert sec_filings._txn_is_recent("", "2026-06-27") is True
+
+
+def test_fetch_filings_falls_back_to_company_queries_when_form59_day_hits_cap():
+    from datetime import date
+
+    calls = []
+
+    def fake_fetch_day(session, path, base_fields, parser, d):
+        calls.append((path, dict(base_fields), d))
+        if path == "r59" and base_fields["ctl00$CPH$ddlCompany"] == "":
+            return [], True
+        return [], False
+
+    old_report_dates = sec_filings.report_dates
+    old_fetch_day = sec_filings._fetch_day
+    sec_filings.report_dates = lambda today: [date(2026, 6, 5)]
+    sec_filings._fetch_day = fake_fetch_day
+    try:
+        rows, failed = sec_filings.fetch_filings(["AP", "SIRI"], today=date(2026, 6, 29))
+    finally:
+        sec_filings.report_dates = old_report_dates
+        sec_filings._fetch_day = old_fetch_day
+
+    assert rows == []
+    assert failed == []
+    form59_company_ids = [
+        fields["ctl00$CPH$ddlCompany"]
+        for path, fields, _ in calls
+        if path == "r59" and fields["ctl00$CPH$ddlCompany"]
+    ]
+    assert form59_company_ids == [
+        sec_filings.FORM59_COMPANY_IDS["AP"],
+        sec_filings.FORM59_COMPANY_IDS["SIRI"],
+    ]
+    assert any(path == "r59" and fields["ctl00$CPH$ddlCompany"] == "" for path, fields, _ in calls)
+    assert sum(1 for path, _, _ in calls if path == "r246") == 1
+    assert next(fields for path, fields, _ in calls if path == "r246")["ctl00$CPH$BsCompany"] == ""
+
+
+def test_fetch_filings_merges_repeated_form59_global_fetches():
+    from datetime import date
+
+    attempts = {"r59_global": 0}
+
+    def row(symbol, filing_id):
+        return {
+            "form": "59",
+            "symbol": symbol,
+            "name": "name",
+            "relationship": "ผู้รายงาน",
+            "action": "ซื้อ",
+            "shares": 1.0,
+            "price": 1.0,
+            "pct_change": None,
+            "pct_after": None,
+            "txn_date": "01/06/2569",
+            "recv_date": "2026-06-02",
+            "source_url": None,
+            "filing_id": filing_id,
+        }
+
+    def fake_fetch_day(session, path, base_fields, parser, d):
+        if path == "r59" and base_fields["ctl00$CPH$ddlCompany"] == "":
+            attempts["r59_global"] += 1
+            if attempts["r59_global"] == 1:
+                return [row("AP", "59:ap")], False
+            return [row("SIRI", "59:siri")], False
+        return [], False
+
+    old_report_dates = sec_filings.report_dates
+    old_fetch_day = sec_filings._fetch_day
+    sec_filings.report_dates = lambda today: [date(2026, 6, 2)]
+    sec_filings._fetch_day = fake_fetch_day
+    try:
+        rows, failed = sec_filings.fetch_filings(["AP", "SIRI"], today=date(2026, 6, 29))
+    finally:
+        sec_filings.report_dates = old_report_dates
+        sec_filings._fetch_day = old_fetch_day
+
+    assert failed == []
+    assert {r["symbol"] for r in rows} == {"AP", "SIRI"}
+    assert attempts["r59_global"] == sec_filings.R59_GLOBAL_ATTEMPTS
 
 
 def test_num():

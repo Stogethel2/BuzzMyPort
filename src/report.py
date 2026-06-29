@@ -69,7 +69,7 @@ _TEMPLATE = Template("""\
 
   {% if sec_failed %}
   <div style="background:#fff3cd;color:#856404;border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:10px">
-    ⚠️ ดึงข้อมูล ก.ล.ต. ไม่สำเร็จบางส่วน: {{ sec_failed|join(", ") }}
+    ⚠️ ดึงข้อมูล ก.ล.ต. ไม่สำเร็จ {{ sec_failed|length }} รายการ: {{ sec_failed[:4]|join(", ") }}{% if sec_failed|length > 4 %} …{% endif %}
   </div>
   {% endif %}
 
