@@ -44,6 +44,7 @@ def build():
     usdthb = data_fetcher.get_usdthb()
 
     rows = []
+    high_volume_rows = []
     for h in holdings:
         df = history.get(h["ticker"])
         if df is None:
@@ -53,6 +54,10 @@ def build():
         row["signals"] = indicators.compute_signals(df)
         row["xd_days"] = _xd_days(h["ticker"])
         rows.append(row)
+        high_volume = indicators.high_volume_alert(h["ticker"], df, h["shares"])
+        if high_volume:
+            high_volume["currency"] = row["currency"]
+            high_volume_rows.append(high_volume)
 
     totals = pnl.portfolio_totals(rows, usdthb)
 
@@ -62,9 +67,14 @@ def build():
     sec_period = _sec_period_label(sec_filings.report_dates(today))
 
     asof = datetime.now(TZ).strftime("%d/%m/%Y %H:%M")
-    html = report.render(asof, totals, rows, failed, insider_rows, sec_failed, sec_period)
-    partial = "⚠️ " if (failed or not totals["fx_ok"]) else ""
-    subject = f"📊 {partial}พอร์ต ฿{totals['total_value']:,.0f} ({totals['total_pl_pct']:+.1f}%) — {asof}"
+    html = report.render(asof, totals, rows, failed, insider_rows, sec_failed, sec_period, high_volume_rows)
+    alerts = []
+    if failed or not totals["fx_ok"]:
+        alerts.append("Partial")
+    if high_volume_rows:
+        alerts.append(f"High Vol {len(high_volume_rows)}")
+    alert = f"⚠️ {' / '.join(alerts)} " if alerts else ""
+    subject = f"📊 {alert}พอร์ต ฿{totals['total_value']:,.0f} ({totals['total_pl_pct']:+.1f}%) — {asof}"
     return html, subject
 
 

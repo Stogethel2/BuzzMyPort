@@ -9,6 +9,7 @@
 - แสดง P/L รายตัวและ P/L รวมจากต้นทุนเฉลี่ย
 - แสดง RSI/Stochastic/Crossover ทั้ง 1D และ 1W
 - แสดง XD badge ถ้า ex-date อยู่ในช่วงใกล้ถึง
+- แสดง High Volume เมื่อ volume วันล่าสุดสูงผิดปกติเทียบกับค่าเฉลี่ย
 - ส่งอีเมล HTML ตาม cron อังคาร-เสาร์ เวลา 07:30 Asia/Bangkok
 - แสดงความเคลื่อนไหวผู้บริหาร/ผู้ถือหุ้นใหญ่จาก ก.ล.ต. สำหรับหุ้นไทยในพอร์ต
 
@@ -23,9 +24,10 @@
 2. `src/data_fetcher.py` ดึงราคา, history, dividend/XD และ USD/THB
 3. `src/indicators.py` คำนวณ RSI/Stochastic/Crossover
 4. `src/pnl.py` คำนวณ P/L และยอดรวมเป็นบาท
-5. `src/sec_filings.py` ดึงแบบ 59 และ 246-2 จากเว็บ ก.ล.ต.
-6. `src/report.py` render HTML
-7. `src/email_sender.py` ส่งอีเมลผ่าน Resend
+5. `src/indicators.py` ตรวจ High Volume จาก history เดิม
+6. `src/sec_filings.py` ดึงแบบ 59 และ 246-2 จากเว็บ ก.ล.ต.
+7. `src/report.py` render HTML
+8. `src/email_sender.py` ส่งอีเมลผ่าน Resend
 
 ## Portfolio Config
 `config/portfolio.json`
@@ -57,6 +59,14 @@
 - ตัด filing ที่วันทำรายการเก่ากว่าวันรับเอกสารเกิน 7 วัน เพื่อลดข้อมูลผิดปีหรือรายการย้อนหลังผิดปกติ
 - ถ้าวันไหนแบบ 59 global query ชน cap 100 แถว จะ fallback ไป query รายบริษัทด้วย `FORM59_COMPANY_IDS`
 - ถ้าดึงข้อมูล ก.ล.ต. บางส่วนไม่สำเร็จ เมลยังส่งต่อและแสดง warning ใน section นี้
+
+## High Volume Section
+- แหล่งข้อมูล: `Volume` จาก yfinance history ที่โหลดอยู่แล้ว
+- เกณฑ์ v1: volume วันล่าสุด ≥ 2 เท่าของค่าเฉลี่ย 20 วันก่อนหน้า
+- ค่าเฉลี่ย 20 วันไม่รวมวันล่าสุด เพื่อไม่ให้ spike ดึงค่าเฉลี่ยของตัวเองขึ้น
+- แสดงเฉพาะหุ้นที่มีข้อมูลอย่างน้อย 21 วันและดึงข้อมูลสำเร็จ
+- แสดง ticker, volume/avg20, ราคาเปลี่ยน %, และมูลค่าถือครอง
+- ถ้ามีรายการ จะเพิ่ม `High Vol N` ใน subject อีเมล
 
 ## SEC Scraper Notes
 - iDisc เป็น ASP.NET WebForms ไม่ใช่ JSON API

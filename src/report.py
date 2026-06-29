@@ -58,6 +58,31 @@ _TEMPLATE = Template("""\
     </tbody>
   </table>
 
+  {% if high_volume_rows %}
+  <h3 style="margin:24px 0 4px">⚠️ High Volume</h3>
+  <div style="color:#666;font-size:12px;margin-bottom:10px">Volume ล่าสุด ≥ 2x ค่าเฉลี่ย 20 วันก่อนหน้า — ตรวจข่าว/งบ/รายการพิเศษก่อนตัดสินใจ</div>
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="text-align:left;color:#666;border-bottom:2px solid #eee">
+      <th style="padding:5px 4px">หุ้น</th>
+      <th style="padding:5px 4px;text-align:right">Vol / Avg20</th>
+      <th style="padding:5px 4px;text-align:right">ราคาเปลี่ยน</th>
+      <th style="padding:5px 4px;text-align:right">มูลค่าถือ</th>
+    </tr></thead>
+    <tbody>
+    {% for r in high_volume_rows %}
+      <tr style="border-bottom:1px solid #f0f0f0">
+        <td style="padding:5px 4px;font-weight:600">{{ r.ticker }}</td>
+        <td style="padding:5px 4px;text-align:right">{{ "{:,.0f}".format(r.latest_volume) }} / {{ "{:,.0f}".format(r.avg_volume_20) }} ({{ "%.1f"|format(r.volume_ratio) }}x)</td>
+        <td style="padding:5px 4px;text-align:right;color:{{ '#1e8e3e' if r.price_change_pct is not none and r.price_change_pct >= 0 else '#c0392b' }}">
+          {{ '+' if r.price_change_pct is not none and r.price_change_pct >= 0 else '' }}{{ "%.1f"|format(r.price_change_pct) if r.price_change_pct is not none else "-" }}%
+        </td>
+        <td style="padding:5px 4px;text-align:right">{{ "{:,.0f}".format(r.position_value) }} {{ r.currency }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
   {% if failed %}
   <div style="margin-top:14px;color:#c0392b;font-size:12px">
     ⚠️ ดึงข้อมูลไม่ได้: {{ failed|join(", ") }}
@@ -142,7 +167,7 @@ def _act_color(action):
 _TEMPLATE.globals["act_color"] = _act_color
 
 
-def render(asof, totals, rows, failed, insider_rows=None, sec_failed=None, sec_period=""):
+def render(asof, totals, rows, failed, insider_rows=None, sec_failed=None, sec_period="", high_volume_rows=None):
     return _TEMPLATE.render(asof=asof, totals=totals, rows=rows, failed=failed,
                             insider_rows=insider_rows or [], sec_failed=sec_failed or [],
-                            sec_period=sec_period)
+                            sec_period=sec_period, high_volume_rows=high_volume_rows or [])

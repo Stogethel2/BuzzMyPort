@@ -5,6 +5,33 @@ ponytail: ไม่ใช้ pandas_ta — RSI/Stoch ตัวละ ~10 บร�
 import pandas as pd
 
 
+def high_volume_alert(ticker, df, shares, threshold=2.0, window=20):
+    if "Volume" not in df or len(df) <= window:
+        return None
+    latest_volume = df["Volume"].iloc[-1]
+    prior_volumes = df["Volume"].iloc[-window - 1:-1].dropna()
+    if pd.isna(latest_volume) or len(prior_volumes) < window:
+        return None
+
+    latest_volume = float(latest_volume)
+    avg_volume = float(prior_volumes.mean())
+    if avg_volume <= 0 or latest_volume / avg_volume < threshold:
+        return None
+
+    closes = df["Close"].dropna()
+    price = float(closes.iloc[-1])
+    prev_price = float(closes.iloc[-2]) if len(closes) > 1 else None
+    price_change_pct = ((price - prev_price) / prev_price * 100) if prev_price else None
+    return {
+        "ticker": ticker,
+        "latest_volume": latest_volume,
+        "avg_volume_20": avg_volume,
+        "volume_ratio": round(latest_volume / avg_volume, 2),
+        "price_change_pct": round(price_change_pct, 1) if price_change_pct is not None else None,
+        "position_value": price * shares,
+    }
+
+
 def rsi(close, length=14):
     delta = close.diff()
     gain = delta.clip(lower=0)
