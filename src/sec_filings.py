@@ -137,6 +137,7 @@ def _parse_form59(soup, recv_date):
             "symbol": m.group(1) if m else None,
             "name": c[1],
             "relationship": c[2],
+            "security_type": c[3],
             "action": c[7],          # ซื้อ / ขาย / โอน
             "shares": _num(c[5]),
             "price": _num(c[6]),
@@ -163,6 +164,7 @@ def _parse_form246(soup, recv_date):
             "symbol": c[0] or None,
             "name": c[1],
             "relationship": "ผู้ถือหุ้นใหญ่",
+            "security_type": c[3],
             "action": c[2],          # ได้มา / จำหน่าย / สิ้นสุด...
             "shares": None,
             "price": None,
@@ -247,6 +249,7 @@ def fetch_filings(symbols, today=None):
                 if path == "r59":
                     for symbol in ordered_want:
                         if symbol not in FORM59_COMPANY_IDS:
+                            failed.append(f"r59 {symbol} {d.isoformat()} (>100 แถว ไม่มี company id)")
                             continue
                         try:
                             company_rows, _ = _fetch_form59_company_day(session, symbol, d)

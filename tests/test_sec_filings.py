@@ -20,6 +20,7 @@ def test_form59_parse():
     assert gtb["action"] == "ซื้อ"
     assert gtb["shares"] == 95400.0          # '95,400' -> ตัด comma
     assert gtb["price"] == 0.69
+    assert gtb["security_type"] == "หุ้นสามัญ"
     assert gtb["txn_date"] == "23/06/2569"   # คงรูปแบบ พ.ศ. ไว้แสดง
     assert gtb["recv_date"] == "2026-06-24"
     assert gtb["filing_id"].startswith("59:")
@@ -42,6 +43,7 @@ def test_form59_transfer_has_no_price():
     transfers = [r for r in rows if r["action"] == "โอน"]
     if transfers:
         assert transfers[0]["price"] is None  # 'โอน' ราคา '-' -> None
+        assert transfers[0]["security_type"] == "ใบสำคัญแสดงสิทธิที่จะซื้อหุ้น"
 
 
 def test_form246_parse():
@@ -120,6 +122,28 @@ def test_fetch_filings_falls_back_to_company_queries_when_form59_day_hits_cap():
     assert any(path == "r59" and fields["ctl00$CPH$ddlCompany"] == "" for path, fields, _ in calls)
     assert sum(1 for path, _, _ in calls if path == "r246") == 1
     assert next(fields for path, fields, _ in calls if path == "r246")["ctl00$CPH$BsCompany"] == ""
+
+
+def test_fetch_filings_warns_when_form59_cap_has_no_company_id():
+    from datetime import date
+
+    def fake_fetch_day(session, path, base_fields, parser, d):
+        if path == "r59":
+            return [], True
+        return [], False
+
+    old_report_dates = sec_filings.report_dates
+    old_fetch_day = sec_filings._fetch_day
+    sec_filings.report_dates = lambda today: [date(2026, 6, 5)]
+    sec_filings._fetch_day = fake_fetch_day
+    try:
+        rows, failed = sec_filings.fetch_filings(["DIF"], today=date(2026, 6, 29))
+    finally:
+        sec_filings.report_dates = old_report_dates
+        sec_filings._fetch_day = old_fetch_day
+
+    assert rows == []
+    assert failed == ["r59 DIF 2026-06-05 (>100 แถว ไม่มี company id)"]
 
 
 def test_fetch_filings_merges_repeated_form59_global_fetches():

@@ -50,12 +50,36 @@ def stochastic(df, k=14, d=3):
     return percent_k, percent_d
 
 
+def _adjusted_ohlc(df):
+    if "Adj Close" not in df or "Close" not in df:
+        return df
+    out = df.copy()
+    ratio = out["Adj Close"] / out["Close"]
+    out[["Open", "High", "Low", "Close"]] = out[["Open", "High", "Low", "Close"]].mul(ratio, axis=0)
+    return out
+
+
+def _stoch_cross(k, d):
+    both = pd.concat([k, d], axis=1).dropna()
+    if len(both) < 2:
+        return None
+    prev_k, prev_d = both.iloc[-2]
+    latest_k, latest_d = both.iloc[-1]
+    if prev_k <= prev_d and latest_k > latest_d:
+        return "up"
+    if prev_k >= prev_d and latest_k < latest_d:
+        return "down"
+    return None
+
+
 def _timeframe_signals(df):
     r = rsi(df["Close"])
-    k, _ = stochastic(df)
+    k, d = stochastic(df)
     return {
         "rsi": round(float(r.dropna().iloc[-1]), 1) if r.notna().any() else None,
         "stoch_k": round(float(k.dropna().iloc[-1]), 1) if k.notna().any() else None,
+        "stoch_d": round(float(d.dropna().iloc[-1]), 1) if d.notna().any() else None,
+        "stoch_cross": _stoch_cross(k, d),
     }
 
 
@@ -72,4 +96,5 @@ def _to_weekly(df):
 
 def compute_signals(df):
     """คืน {'d1': {...}, 'w1': {...}} สำหรับหุ้น 1 ตัว"""
+    df = _adjusted_ohlc(df)
     return {"d1": _timeframe_signals(df), "w1": _timeframe_signals(_to_weekly(df))}

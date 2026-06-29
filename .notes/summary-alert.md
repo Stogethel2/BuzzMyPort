@@ -7,7 +7,7 @@
 - รองรับหุ้นไทย (`.BK`) และหุ้นสหรัฐใน `config/portfolio.json`
 - แสดงมูลค่ารวมเป็นบาท โดยแปลงหุ้นสหรัฐด้วย USD/THB
 - แสดง P/L รายตัวและ P/L รวมจากต้นทุนเฉลี่ย
-- แสดง RSI/Stochastic/Crossover ทั้ง 1D และ 1W
+- แสดง RSI/Stochastic K/D/Crossover ทั้ง 1D และ 1W โดยใช้ราคา adjusted สำหรับ indicator
 - แสดง XD badge ถ้า ex-date อยู่ในช่วงใกล้ถึง
 - แสดง High Volume เมื่อ volume วันล่าสุดสูงผิดปกติเทียบกับค่าเฉลี่ย
 - ส่งอีเมล HTML ตาม cron อังคาร-เสาร์ เวลา 07:30 Asia/Bangkok
@@ -54,7 +54,7 @@
   - อังคารครอบเสาร์-อาทิตย์-จันทร์
   - พุธ-เสาร์ครอบเมื่อวานวันเดียว
 - ใช้ `rblDateType=2` เพื่อ query ตามวันที่ ก.ล.ต. รับเอกสาร/เผยแพร่ ไม่ใช่วันที่ทำรายการ
-- แบบ 59 แสดงชื่อ, ความสัมพันธ์, ซื้อ/ขาย/โอน, จำนวน, ราคา และวันที่ทำรายการ
+- แบบ 59 แสดงชื่อ, ความสัมพันธ์, ประเภทหลักทรัพย์, ซื้อ/ขาย/โอน, จำนวน, ราคา และวันที่ทำรายการ
 - แบบ 246-2 ไม่มีราคา/จำนวนหุ้น จึงแสดง % เปลี่ยนและ % หลังรายการ
 - ตัด filing ที่วันทำรายการเก่ากว่าวันรับเอกสารเกิน 7 วัน เพื่อลดข้อมูลผิดปีหรือรายการย้อนหลังผิดปกติ
 - ถ้าวันไหนแบบ 59 global query ชน cap 100 แถว จะ fallback ไป query รายบริษัทด้วย `FORM59_COMPANY_IDS`
@@ -82,6 +82,7 @@
 - GitHub Actions ใช้ cron `30 0 * * 2-6` ซึ่งเท่ากับ 07:30 Asia/Bangkok อังคาร-เสาร์
 - Required secrets: `RESEND_API_KEY`, `REPORT_TO_EMAIL`
 - Optional secret: `REPORT_FROM_EMAIL`
+- Real send uses strict core-data mode: no email is sent if any holding price fetch fails, or if the portfolio has USD holdings and USD/THB is unavailable
 
 ## Known Limits
 - ราคาเป็น close ล่าสุด ไม่ใช่ real-time

@@ -36,12 +36,25 @@ def _xd_days(ticker):
     return days if 0 <= days <= XD_WINDOW_DAYS else None
 
 
-def build():
+def _core_data_errors(holdings, failed, usdthb):
+    errors = []
+    if failed:
+        errors.append(f"price fetch failed: {', '.join(failed)}")
+    if usdthb is None and any(pnl.currency_of(h["ticker"]) == "USD" for h in holdings):
+        errors.append("USD/THB fetch failed")
+    return errors
+
+
+def build(strict=False):
     holdings = json.loads(CONFIG_PATH.read_text())["holdings"]
     tickers = [h["ticker"] for h in holdings]
 
     history, failed = data_fetcher.fetch_all(tickers)
     usdthb = data_fetcher.get_usdthb()
+    if strict:
+        errors = _core_data_errors(holdings, failed, usdthb)
+        if errors:
+            raise RuntimeError("not sending email: " + "; ".join(errors))
 
     rows = []
     high_volume_rows = []
@@ -79,8 +92,9 @@ def build():
 
 
 def main():
-    html, subject = build()
     has_creds = os.environ.get("RESEND_API_KEY") and os.environ.get("REPORT_TO_EMAIL")
+    dry_run = os.environ.get("DRY_RUN")
+    html, subject = build(strict=bool(has_creds and not dry_run))
     if os.environ.get("DRY_RUN") or not has_creds:
         print(subject)
         print(html)
