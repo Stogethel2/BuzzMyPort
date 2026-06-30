@@ -83,6 +83,7 @@
 - Required secrets: `RESEND_API_KEY`, `REPORT_TO_EMAIL`
 - Optional secret: `REPORT_FROM_EMAIL`
 - Real send uses strict core-data mode: no email is sent if any holding price fetch fails, or if the portfolio has USD holdings and USD/THB is unavailable
+- Real send also requires `RESEND_API_KEY` and `REPORT_TO_EMAIL`; missing secrets now fail the workflow instead of silently dry-running
 
 ## Known Limits
 - ราคาเป็น close ล่าสุด ไม่ใช่ real-time

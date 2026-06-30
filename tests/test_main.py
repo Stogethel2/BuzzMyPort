@@ -43,3 +43,24 @@ def test_build_strict_rejects_missing_fx_for_usd_holding(monkeypatch, tmp_path):
 
     with pytest.raises(RuntimeError, match="USD/THB fetch failed"):
         main.build(strict=True)
+
+
+def test_main_rejects_real_run_without_required_email_env(monkeypatch):
+    monkeypatch.delenv("DRY_RUN", raising=False)
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.delenv("REPORT_TO_EMAIL", raising=False)
+    monkeypatch.setattr(main, "build", lambda strict=False: ("html", "subject"))
+
+    with pytest.raises(RuntimeError, match="missing required env: RESEND_API_KEY, REPORT_TO_EMAIL"):
+        main.main()
+
+
+def test_main_dry_run_allows_missing_email_env(monkeypatch, capsys):
+    monkeypatch.setenv("DRY_RUN", "1")
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.delenv("REPORT_TO_EMAIL", raising=False)
+    monkeypatch.setattr(main, "build", lambda strict=False: ("html", "subject"))
+
+    main.main()
+
+    assert "subject" in capsys.readouterr().out

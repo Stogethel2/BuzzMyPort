@@ -91,14 +91,23 @@ def build(strict=False):
     return html, subject
 
 
+def _missing_email_env():
+    return [name for name in ("RESEND_API_KEY", "REPORT_TO_EMAIL") if not os.environ.get(name)]
+
+
 def main():
-    has_creds = os.environ.get("RESEND_API_KEY") and os.environ.get("REPORT_TO_EMAIL")
     dry_run = os.environ.get("DRY_RUN")
-    html, subject = build(strict=bool(has_creds and not dry_run))
-    if os.environ.get("DRY_RUN") or not has_creds:
+    if dry_run:
+        html, subject = build()
         print(subject)
         print(html)
         return
+
+    missing = _missing_email_env()
+    if missing:
+        raise RuntimeError("missing required env: " + ", ".join(missing))
+
+    html, subject = build(strict=True)
     email_sender.send(html, subject)
     print("sent:", subject)
 
