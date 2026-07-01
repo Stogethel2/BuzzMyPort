@@ -45,7 +45,7 @@ _TEMPLATE = Template("""\
     <tbody>
     {% for r in rows %}
       <tr style="border-bottom:1px solid #f0f0f0">
-        <td style="padding:6px 4px;font-weight:600">{{ r.ticker }}
+        <td style="padding:6px 4px;font-weight:600">{{ r.name or r.ticker }}
           {% if r.xd_days is not none %}<span style="background:#fff3cd;color:#856404;border-radius:4px;padding:1px 5px;font-size:11px">XD {{ r.xd_days }}d</span>{% endif %}
         </td>
         <td style="padding:6px 4px;text-align:right">{{ "%.2f"|format(r.price) }} {{ r.currency }}</td>

@@ -14,6 +14,7 @@ def position_pnl(holding, price):
     pl_pct = (pl / cost * 100) if cost else 0.0
     return {
         "ticker": holding["ticker"],
+        "name": holding.get("name", holding["ticker"]),
         "currency": currency_of(holding["ticker"]),
         "shares": shares,
         "avg_cost": holding["avg_cost"],
@@ -58,6 +59,10 @@ def _demo():
     ]
     assert pos[0]["pl"] == 500.0  # (35-34.5)*1000
     assert pos[0]["currency"] == "THB" and pos[1]["currency"] == "USD"
+    assert pos[0]["name"] == "PTT.BK"  # default = ticker
+    gold = position_pnl({"ticker": "GC=F", "shares": 0.05, "avg_cost": 3974.6, "name": "ทองคำ (oz)"}, 4100.0)
+    assert gold["name"] == "ทองคำ (oz)" and gold["currency"] == "USD"
+    assert round(gold["value"], 2) == 205.0  # 4100*0.05
 
     t = portfolio_totals(pos, usdthb=34.0)
     # thb_value=35000, usd_value=1900 -> 35000 + 1900*34 = 99600

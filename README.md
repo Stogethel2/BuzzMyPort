@@ -8,13 +8,16 @@
 {
   "holdings": [
     { "ticker": "PTT.BK", "shares": 1000, "avg_cost": 34.50 },
-    { "ticker": "AAPL",   "shares": 10,   "avg_cost": 185.20 }
+    { "ticker": "AAPL",   "shares": 10,   "avg_cost": 185.20 },
+    { "ticker": "GC=F",   "shares": 0.05, "avg_cost": 3974.60, "name": "ทองคำ (oz)" }
   ]
 }
 ```
 - `ticker` — รูปแบบ Yahoo Finance: หุ้นไทยลงท้าย `.BK`, หุ้นเมกาใส่ symbol เปล่า
 - `shares` — จำนวนหุ้นถือ (รวมทุก lot)
 - `avg_cost` — ราคาทุนเฉลี่ย/หุ้น สกุลตามตลาด (฿ สำหรับ `.BK`, $ สำหรับเมกา)
+- `name` — *(ไม่บังคับ)* ชื่อที่แสดงในตารางแทน ticker
+- **ทองคำ** — ใช้ `GC=F` (ราคาต่อออนซ์ USD, นับเป็น USD แปลงบาทให้อัตโนมัติ), `shares` = จำนวนออนซ์ (oz). XAUUSD=X ถูกถอดจาก Yahoo แล้ว; GC=F เป็นฟิวเจอร์ส basis ต่างจากสปอตเล็กน้อย
 
 ## รัน local (ไม่ส่งเมล)
 ```bash

@@ -13,6 +13,7 @@
     { "ticker": "TU.BK", "shares": 2000, "avg_cost": 12.66 },
     { "ticker": "QQQM", "shares": 1, "avg_cost": 288 },
     { "ticker": "CPNREIT.BK", "shares": 100, "avg_cost": 12.5 },
-    { "ticker": "TASCO.BK", "shares": 1000, "avg_cost": 14.89 }
+    { "ticker": "TASCO.BK", "shares": 1000, "avg_cost": 14.89 },
+    { "ticker": "GC=F", "shares": 0.05, "avg_cost": 3974.60, "name": "ทองคำ (oz)", "skip_high_volume": true }
   ]
 }

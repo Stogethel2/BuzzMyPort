@@ -67,8 +67,9 @@ def build(strict=False):
         row["signals"] = indicators.compute_signals(df)
         row["xd_days"] = _xd_days(h["ticker"])
         rows.append(row)
-        high_volume = indicators.high_volume_alert(h["ticker"], df, h["shares"])
+        high_volume = None if h.get("skip_high_volume") else indicators.high_volume_alert(h["ticker"], df, h["shares"])
         if high_volume:
+            high_volume["ticker"] = row["name"]
             high_volume["currency"] = row["currency"]
             high_volume_rows.append(high_volume)
 
