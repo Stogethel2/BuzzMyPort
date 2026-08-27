@@ -1,16 +1,16 @@
 # Stock Portfolio Summary Alert
 
 ## Purpose
-ระบบส่งอีเมลสรุปพอร์ตหุ้นอัตโนมัติทุกเช้า 07:30 Asia/Bangkok ผ่าน GitHub Actions เพื่อดูมูลค่าพอร์ต, P/L, momentum, XD และความเคลื่อนไหวผู้บริหาร/ผู้ถือหุ้นใหญ่ของหุ้นไทยในพอร์ต
+ระบบส่งอีเมลสรุปพอร์ตหุ้นอัตโนมัติทุกเช้า 07:17 Asia/Bangkok ผ่าน GitHub Actions เพื่อดูมูลค่าพอร์ต, P/L, momentum, XD และความเคลื่อนไหวผู้บริหาร/ผู้ถือหุ้นใหญ่ของหุ้นไทยในพอร์ต
 
 ## Scope
 - รองรับหุ้นไทย (`.BK`) และหุ้นสหรัฐใน `config/portfolio.json`
 - แสดงมูลค่ารวมเป็นบาท โดยแปลงหุ้นสหรัฐด้วย USD/THB
 - แสดง P/L รายตัวและ P/L รวมจากต้นทุนเฉลี่ย
-- แสดง RSI/Stochastic K/D/Crossover ทั้ง 1D และ 1W โดยใช้ราคา adjusted สำหรับ indicator
-- แสดง XD badge ถ้า ex-date อยู่ในช่วงใกล้ถึง
+- แสดง RSI(14, Wilder) + Slow Stochastic(14,3,3) K/D/Crossover ทั้ง 1D และ 1W โดยใช้ราคา adjusted สำหรับ indicator — ตรงกับ default ของ TradingView/StockCharts
+- แสดง XD badge ถ้า ex-date อยู่ในช่วงใกล้ถึง — ถ้าดึง calendar ไม่ได้จะเตือนในเมลว่าเช็คตัวไหนไม่ได้ (ไม่ปล่อยให้ badge หายเงียบ) แต่ไม่บล็อกการส่ง — yfinance กลืน HTTP error แล้วคืน `{}` จึงใช้ dict ว่าง = ดึงไม่สำเร็จ, ตราสารที่ไม่มีปฏิทินจริง ๆ ตั้ง `skip_xd`
 - แสดง High Volume เมื่อ volume วันล่าสุดสูงผิดปกติเทียบกับค่าเฉลี่ย
-- ส่งอีเมล HTML ตาม cron อังคาร-เสาร์ เวลา 07:30 Asia/Bangkok
+- ส่งอีเมล HTML ตาม cron อังคาร-เสาร์ เวลา 07:17 Asia/Bangkok
 - แสดงความเคลื่อนไหวผู้บริหาร/ผู้ถือหุ้นใหญ่จาก ก.ล.ต. สำหรับหุ้นไทยในพอร์ต
 
 ## Out Of Scope
@@ -79,7 +79,7 @@
 - Local dry-run: `DRY_RUN=1 PYTHONPATH=. python3 main.py`
 - SEC parser tests: `PYTHONPATH=. pytest -q tests/test_sec_filings.py`
 - Legacy direct test runner: `PYTHONPATH=. python3 tests/test_sec_filings.py`
-- GitHub Actions ใช้ cron `30 0 * * 2-6` ซึ่งเท่ากับ 07:30 Asia/Bangkok อังคาร-เสาร์
+- GitHub Actions ใช้ cron `17 0 * * 2-6` ซึ่งเท่ากับ 07:17 Asia/Bangkok อังคาร-เสาร์
 - Required secrets: `RESEND_API_KEY`, `REPORT_TO_EMAIL`
 - Optional secret: `REPORT_FROM_EMAIL`
 - Real send uses strict core-data mode: no email is sent if any holding price fetch fails, or if the portfolio has USD holdings and USD/THB is unavailable

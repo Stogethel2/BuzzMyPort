@@ -58,6 +58,7 @@ def build(strict=False):
 
     rows = []
     high_volume_rows = []
+    xd_failed = []
     for h in holdings:
         df = history.get(h["ticker"])
         if df is None:
@@ -65,7 +66,12 @@ def build(strict=False):
         price = float(df["Close"].dropna().iloc[-1])
         row = pnl.position_pnl(h, price)
         row["signals"] = indicators.compute_signals(df)
-        row["xd_days"] = _xd_days(h["ticker"])
+        row["xd_days"] = None
+        if not h.get("skip_xd"):
+            try:
+                row["xd_days"] = _xd_days(h["ticker"])
+            except Exception:  # XD เป็นข้อมูลเสริม ไม่ควรบล็อกรายงานทั้งฉบับ แค่บอกให้รู้ในเมล
+                xd_failed.append(h["ticker"])
         rows.append(row)
         high_volume = None if h.get("skip_high_volume") else indicators.high_volume_alert(h["ticker"], df, h["shares"])
         if high_volume:
@@ -81,7 +87,8 @@ def build(strict=False):
     sec_period = _sec_period_label(sec_filings.report_dates(today))
 
     asof = datetime.now(TZ).strftime("%d/%m/%Y %H:%M")
-    html = report.render(asof, totals, rows, failed, insider_rows, sec_failed, sec_period, high_volume_rows)
+    html = report.render(asof, totals, rows, failed, insider_rows, sec_failed, sec_period,
+                         high_volume_rows, xd_failed)
     alerts = []
     if failed or not totals["fx_ok"]:
         alerts.append("Partial")

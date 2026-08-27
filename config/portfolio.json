@@ -11,8 +11,8 @@
     { "ticker": "UVAN.BK", "shares": 6000, "avg_cost": 9.53 },
     { "ticker": "PTT.BK", "shares": 1200, "avg_cost": 33.13 },
     { "ticker": "TU.BK", "shares": 2000, "avg_cost": 12.66 },
-    { "ticker": "QQQM", "shares": 3, "avg_cost": 288 },
+    { "ticker": "QQQM", "shares": 3, "avg_cost": 288, "skip_xd": true },
     { "ticker": "CPNREIT.BK", "shares": 100, "avg_cost": 12.5 },
-    { "ticker": "GC=F", "shares": 0.05, "avg_cost": 3974.60, "name": "ทองคำ (oz)", "skip_high_volume": true }
+    { "ticker": "GC=F", "shares": 0.05, "avg_cost": 3974.60, "name": "ทองคำ (oz)", "skip_high_volume": true, "skip_xd": true }
   ]
 }

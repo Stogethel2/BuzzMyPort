@@ -3,7 +3,7 @@ from jinja2 import Template
 
 _TEMPLATE = Template("""\
 {% macro c(v, ob, os_) %}{% if v is none %}-{% elif v >= ob %}<span style="background:#e53935;color:#fff;border-radius:5px;padding:2px 7px;font-weight:700">{{ "%.0f"|format(v) }}</span>{% elif v <= os_ %}<span style="background:#22c55e;color:#fff;border-radius:5px;padding:2px 7px;font-weight:700">{{ "%.0f"|format(v) }}</span>{% else %}<span style="color:#888">{{ "%.0f"|format(v) }}</span>{% endif %}{% endmacro %}
-{% macro stoch_line(label, s) %}{% if s.stoch_k is none or s.stoch_d is none %}<div><span style="color:#777">{{ label }}</span> -</div>{% else %}{% set bull = s.stoch_k > s.stoch_d %}{% set bear = s.stoch_k < s.stoch_d %}<div style="white-space:nowrap"><span style="color:#777">{{ label }}</span> <span style="color:{{ '#1e8e3e' if bull else '#c0392b' if bear else '#888' }};font-weight:700">{{ 'Bull' if bull else 'Bear' if bear else 'Flat' }}{% if s.stoch_cross == "up" %} ↑{% elif s.stoch_cross == "down" %} ↓{% endif %}</span> <span style="color:#777">K</span> {{ c(s.stoch_k, 80, 20) }} <span style="color:#777">/ D</span> {{ c(s.stoch_d, 80, 20) }}</div>{% endif %}{% endmacro %}
+{% macro stoch_line(label, s) %}{% if s.stoch_k is none or s.stoch_d is none %}<div><span style="color:#777">{{ label }}</span> -</div>{% else %}{% set bull = s.stoch_bias == "bull" %}{% set bear = s.stoch_bias == "bear" %}<div style="white-space:nowrap"><span style="color:#777">{{ label }}</span> <span style="color:{{ '#1e8e3e' if bull else '#c0392b' if bear else '#888' }};font-weight:700">{{ 'Bull' if bull else 'Bear' if bear else 'Flat' }}{% if s.stoch_cross == "up" %} ↑{% elif s.stoch_cross == "down" %} ↓{% endif %}</span> <span style="color:#777">K</span> {{ c(s.stoch_k, 80, 20) }} <span style="color:#777">/ D</span> {{ c(s.stoch_d, 80, 20) }}</div>{% endif %}{% endmacro %}
 <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:680px;margin:auto;color:#1a1a1a">
   <h2 style="margin-bottom:4px">📊 มูลค่าพอร์ตรวม</h2>
   <div style="color:#666;font-size:13px;margin-bottom:12px">{{ asof }}</div>
@@ -58,6 +58,12 @@ _TEMPLATE = Template("""\
     {% endfor %}
     </tbody>
   </table>
+
+  {% if xd_failed %}
+  <div style="margin-top:10px;color:#856404;font-size:12px">
+    ⚠️ เช็ควัน XD ไม่ได้ {{ xd_failed|length }} ตัว ({{ xd_failed|join(", ") }}) — badge XD ของตัวที่ว่าอาจหายไป ไม่ได้แปลว่าไม่มีปันผล
+  </div>
+  {% endif %}
 
   {% if high_volume_rows %}
   <h3 style="margin:24px 0 4px">⚠️ High Volume</h3>
@@ -172,7 +178,9 @@ def _act_color(action):
 _TEMPLATE.globals["act_color"] = _act_color
 
 
-def render(asof, totals, rows, failed, insider_rows=None, sec_failed=None, sec_period="", high_volume_rows=None):
+def render(asof, totals, rows, failed, insider_rows=None, sec_failed=None, sec_period="",
+           high_volume_rows=None, xd_failed=None):
     return _TEMPLATE.render(asof=asof, totals=totals, rows=rows, failed=failed,
                             insider_rows=insider_rows or [], sec_failed=sec_failed or [],
-                            sec_period=sec_period, high_volume_rows=high_volume_rows or [])
+                            sec_period=sec_period, high_volume_rows=high_volume_rows or [],
+                            xd_failed=xd_failed or [])

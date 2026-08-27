@@ -2,7 +2,7 @@ name: Daily Stock Report
 
 on:
   schedule:
-    - cron: "30 0 * * 2-6"   # 00:30 UTC = 07:30 ICT, อ-ส (รายงานวันถัดไปของแต่ละวันเทรด จ-ศ)
+    - cron: "17 0 * * 2-6"   # 00:17 UTC = 07:17 ICT, อ-ส (รายงานวันถัดไปของแต่ละวันเทรด จ-ศ)
   workflow_dispatch: {}        # ปุ่มรันมือทดสอบ
 
 jobs:

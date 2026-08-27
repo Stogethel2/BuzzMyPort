@@ -40,21 +40,27 @@ def fetch_all(tickers, period="1y"):
 
 
 def get_next_xd(ticker):
-    """วันขึ้นเครื่องหมาย XD ที่จะถึง (date) หรือ None ถ้าไม่มี/ดึงไม่ได้
+    """วันขึ้นเครื่องหมาย XD ที่จะถึง (date) หรือ None ถ้าไม่มีปันผลรอคิว
 
+    โยน error ถ้าดึง calendar ไม่ได้ (rate-limit/network) — "ไม่มี XD" กับ "ดึงไม่ได้"
+    คนละเรื่องกัน ถ้ากลืนเป็น None ทั้งคู่ badge XD จะหายเงียบโดยไม่มีใครรู้
+
+    yfinance กลืน HTTPError เองแล้วคืน calendar เป็น {} (scrapers/quote.py _fetch_calendar)
+    จึงต้องใช้ "dict ว่าง" เป็นสัญญาณว่าดึงไม่สำเร็จ — หุ้นที่ดึงได้จริงจะมีคีย์ Earnings*
+    ติดมาเสมอแม้ไม่มีปันผลรอ (เช็คกับพอร์ตจริงแล้ว DIF.BK ไม่มี Ex-Dividend Date แต่ dict ไม่ว่าง)
+    ตราสารที่ไม่มีปฏิทินเลยจริง ๆ (ETF/ฟิวเจอร์ส) ให้ตั้ง skip_xd ใน portfolio.json
     yfinance .calendar คืน dict หรือ DataFrame แล้วแต่เวอร์ชัน — กันทั้งสองแบบ
     """
-    try:
-        cal = yf.Ticker(ticker).calendar
-        if isinstance(cal, dict):
-            val = cal.get("Ex-Dividend Date")
-        else:  # DataFrame เก่า
-            val = cal.loc["Ex-Dividend Date"].iloc[0] if "Ex-Dividend Date" in cal.index else None
-        if val is None:
-            return None
-        return val[0] if isinstance(val, list) else val
-    except Exception:
+    cal = yf.Ticker(ticker).calendar
+    if cal is None or len(cal) == 0:  # len() ไม่ใช่ truthiness — DataFrame โยน ValueError
+        raise RuntimeError(f"calendar unavailable for {ticker}")
+    if isinstance(cal, dict):
+        val = cal.get("Ex-Dividend Date")
+    else:  # DataFrame เก่า
+        val = cal.loc["Ex-Dividend Date"].iloc[0] if "Ex-Dividend Date" in cal.index else None
+    if val is None:
         return None
+    return val[0] if isinstance(val, list) else val
 
 
 def get_usdthb():

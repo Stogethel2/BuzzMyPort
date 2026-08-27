@@ -1,3 +1,4 @@
+import pytest
 import pandas as pd
 
 from src import indicators
@@ -54,8 +55,9 @@ def test_timeframe_signals_include_stoch_d_and_cross():
 
     signals = indicators._timeframe_signals(df)
 
-    assert signals["stoch_k"] == 20.0
-    assert signals["stoch_d"] == 13.3
+    # raw %K จบที่ [10,10,10,10,10,20] -> slow %K = SMA3 = 13.3, %D = SMA3(%K) = 11.1
+    assert signals["stoch_k"] == 13.3
+    assert signals["stoch_d"] == 11.1
     assert signals["stoch_cross"] == "up"
 
 
@@ -80,3 +82,63 @@ def test_high_volume_alert_requires_21_days():
 
 def test_high_volume_alert_requires_latest_volume():
     assert indicators.high_volume_alert("PTT.BK", _history([100] * 20 + [200, None]), 1000) is None
+
+
+def test_stoch_bias_available_on_first_valid_bar_without_cross():
+    """หุ้นเข้าใหม่: (14,3,3) ให้ %D จุดแรกที่แท่งที่ 18 — ต้องรู้ Bull/Bear แม้ยังเทียบ cross ไม่ได้"""
+    closes = list(range(10, 28))
+    df = pd.DataFrame(
+        {
+            "Open": closes,
+            "High": [100] * len(closes),
+            "Low": [0] * len(closes),
+            "Close": closes,
+            "Volume": [100] * len(closes),
+        },
+        index=pd.date_range("2026-01-01", periods=len(closes), freq="D"),
+    )
+
+    signals = indicators._timeframe_signals(df)
+
+    assert signals["stoch_k"] == 26.0 and signals["stoch_d"] == 25.0
+    assert signals["stoch_bias"] == "bull"
+    assert signals["stoch_cross"] is None
+
+
+def test_stoch_k_and_d_always_come_from_the_same_bar():
+    """Close ขาดไปแท่งนึงทำให้ %K กับ %D หมดอายุคนละแท่ง — ห้ามรายงานเลขข้ามแท่งกัน"""
+    closes = [10 + (i * 7) % 23 for i in range(40)]
+    df = pd.DataFrame(
+        {
+            "Open": closes,
+            "High": [x + 3 for x in closes],
+            "Low": [x - 3 for x in closes],
+            "Close": closes,
+            "Volume": [100] * len(closes),
+        },
+        index=pd.date_range("2026-01-01", periods=len(closes), freq="D"),
+    )
+    df.loc[df.index[-4], "Close"] = float("nan")  # ตำแหน่งนี้ทำให้ %K กับ %D หมดอายุห่างกัน 4 แท่ง
+
+    signals = indicators._timeframe_signals(df)
+    k, d = indicators.stochastic(df)
+    same_bar = ((k.round(1) == signals["stoch_k"]) & (d.round(1) == signals["stoch_d"])).any()
+
+    assert signals["stoch_k"] is not None
+    assert same_bar, "K/D ที่รายงานไม่ได้เกิดขึ้นพร้อมกันในแท่งเดียว"
+
+
+def test_rsi_matches_wilder_definition_on_short_series():
+    """1W มีแค่ ~52 แท่ง — ถ้า seed ผิด (ewm เปล่า ๆ) ค่าจะเพี้ยนจากนิยาม Wilder"""
+    closes = pd.Series([100 + (i * 13) % 17 - (i % 5) for i in range(52)], dtype=float)
+
+    n = 14
+    deltas = closes.diff().dropna()
+    avg_gain = deltas[:n].clip(lower=0).mean()
+    avg_loss = (-deltas[:n].clip(upper=0)).mean()
+    for x in deltas[n:]:
+        avg_gain = (avg_gain * (n - 1) + max(x, 0)) / n
+        avg_loss = (avg_loss * (n - 1) + max(-x, 0)) / n
+    expected = 100 - 100 / (1 + avg_gain / avg_loss)
+
+    assert indicators.rsi(closes).iloc[-1] == pytest.approx(expected)
