@@ -7,6 +7,7 @@
 - รองรับหุ้นไทย (`.BK`) และหุ้นสหรัฐใน `config/portfolio.json`
 - แสดงมูลค่ารวมเป็นบาท โดยแปลงหุ้นสหรัฐด้วย USD/THB
 - แสดง P/L รายตัวและ P/L รวมจากต้นทุนเฉลี่ย
+- แสดง % เปลี่ยนราคา 1D/1W/1M รายตัวและระดับพอร์ต — ดู [price-trend.md](price-trend.md)
 - แสดง RSI(14, Wilder) + Slow Stochastic(14,3,3) K/D/Crossover ทั้ง 1D และ 1W โดยใช้ราคา adjusted สำหรับ indicator — ตรงกับ default ของ TradingView/StockCharts
 - แสดง XD badge ถ้า ex-date อยู่ในช่วงใกล้ถึง — ถ้าดึง calendar ไม่ได้จะเตือนในเมลว่าเช็คตัวไหนไม่ได้ (ไม่ปล่อยให้ badge หายเงียบ) แต่ไม่บล็อกการส่ง — yfinance กลืน HTTP error แล้วคืน `{}` จึงใช้ dict ว่าง = ดึงไม่สำเร็จ, ตราสารที่ไม่มีปฏิทินจริง ๆ ตั้ง `skip_xd`
 - แสดง High Volume เมื่อ volume วันล่าสุดสูงผิดปกติเทียบกับค่าเฉลี่ย
@@ -15,15 +16,15 @@
 
 ## Out Of Scope
 - ข่าว
-- เทียบมูลค่ากับเมื่อวานหรือเก็บ history ระยะยาว
+- เก็บ history ระยะยาว (ทุกตัวเลขคำนวณจาก df 1 ปีที่ดึงมาสด ๆ ไม่มี state ข้ามวัน)
 - lot/transaction tracking และรายงานภาษีรายล็อต
 - dashboard
 
 ## Data Flow
 1. `main.py` โหลด holdings จาก `config/portfolio.json`
 2. `src/data_fetcher.py` ดึงราคา, history, dividend/XD และ USD/THB
-3. `src/indicators.py` คำนวณ RSI/Stochastic/Crossover
-4. `src/pnl.py` คำนวณ P/L และยอดรวมเป็นบาท
+3. `src/indicators.py` คำนวณ RSI/Stochastic/Crossover และ % เปลี่ยนราคา 1D/1W/1M
+4. `src/pnl.py` คำนวณ P/L, ยอดรวมเป็นบาท และ % เปลี่ยนของพอร์ตแต่ละช่วง
 5. `src/indicators.py` ตรวจ High Volume จาก history เดิม
 6. `src/sec_filings.py` ดึงแบบ 59 และ 246-2 จากเว็บ ก.ล.ต.
 7. `src/report.py` render HTML

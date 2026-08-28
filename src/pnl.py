@@ -52,6 +52,33 @@ def portfolio_totals(positions, usdthb):
     return out
 
 
+def portfolio_changes(positions, usdthb):
+    """% และจำนวนบาทที่มูลค่าพอร์ตเปลี่ยนในแต่ละช่วง จาก changes ของแต่ละตัว
+
+    ย้อนหามูลค่าฐานจาก % ที่คำนวณไว้แล้ว (base = value / (1+pct)) จึงไม่ต้องส่งราคาย้อนหลัง
+    เข้ามาอีกชุด ตัวที่ไม่มี % ถูกตัดออกทั้งฝั่ง now และ base เพื่อให้เทียบกันบนชุดเดียวกัน
+
+    ponytail: ใช้เรทวันนี้ทั้งสองฝั่ง ตัวเลขนี้จึงเป็นการเคลื่อนไหวของ "ราคา" ล้วน ไม่รวมผล
+    ค่าเงิน ถ้าอยากแยกผลค่าเงินต้องดึง THB=X ย้อนหลังมาเทียบเพิ่ม
+    """
+    out = {}
+    for period in ("d1", "w1", "m1"):
+        now = base = 0.0
+        for p in positions:
+            pct = (p.get("changes") or {}).get(period)
+            if pct is None or pct <= -100:  # -100% = ราคาเหลือศูนย์ ย้อนหามูลค่าฐานไม่ได้
+                continue
+            rate = usdthb if p["currency"] == "USD" else 1
+            if rate is None:  # ไม่มีเรท -> ตัดหุ้น USD ออก เหมือนที่ portfolio_totals ทำ
+                continue
+            value = p["value"] * rate
+            now += value
+            base += value / (1 + pct / 100)
+        out[period] = {"pct": (now / base - 1) * 100 if base else None,
+                       "diff": now - base if base else None}
+    return out
+
+
 def _demo():
     pos = [
         position_pnl({"ticker": "PTT.BK", "shares": 1000, "avg_cost": 34.5}, 35.0),
@@ -72,6 +99,18 @@ def _demo():
 
     nofx = portfolio_totals(pos, usdthb=None)
     assert nofx["fx_ok"] is False and nofx["total_value"] == 35000.0
+
+    pos[0]["changes"] = {"d1": 10.0, "w1": None, "m1": None}   # ไทย 35,000฿
+    pos[1]["changes"] = {"d1": 10.0, "w1": 5.0, "m1": None}    # เมกา $1,900 -> 64,600฿
+    ch = portfolio_changes(pos, usdthb=34.0)
+    assert round(ch["d1"]["pct"], 6) == 10.0  # ทุกตัว +10% -> พอร์ต +10%
+    assert round(ch["w1"]["pct"], 6) == 5.0   # ตัวที่ไม่มีข้อมูลถูกตัดออกทั้งสองฝั่ง
+    assert round(ch["w1"]["diff"], 0) == 3076.0  # 64,600 - 64,600/1.05 คิดเป็นบาทแล้ว
+    assert ch["m1"]["pct"] is None and ch["m1"]["diff"] is None
+
+    nofx_ch = portfolio_changes(pos, usdthb=None)
+    assert round(nofx_ch["d1"]["diff"], 2) == 3181.82  # เหลือแต่หุ้นไทย 35,000 - 35,000/1.1
+    assert nofx_ch["w1"]["pct"] is None  # ช่วงนี้มีแต่หุ้น USD ที่ถูกตัดออก
     print("pnl self-check OK")
 
 

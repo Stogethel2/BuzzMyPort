@@ -3,6 +3,7 @@ from jinja2 import Template
 
 _TEMPLATE = Template("""\
 {% macro c(v, ob, os_) %}{% if v is none %}-{% elif v >= ob %}<span style="background:#e53935;color:#fff;border-radius:5px;padding:2px 7px;font-weight:700">{{ "%.0f"|format(v) }}</span>{% elif v <= os_ %}<span style="background:#22c55e;color:#fff;border-radius:5px;padding:2px 7px;font-weight:700">{{ "%.0f"|format(v) }}</span>{% else %}<span style="color:#888">{{ "%.0f"|format(v) }}</span>{% endif %}{% endmacro %}
+{% macro chg(label, v) %}<span style="color:#999">{{ label }}</span> {% if v is none %}<span style="color:#bbb">-</span>{% else %}<span style="color:{{ pct_color(v) }}">{{ fmt_pct(v) }}</span>{% endif %}{% endmacro %}
 {% macro stoch_line(label, s) %}{% if s.stoch_k is none or s.stoch_d is none %}<div><span style="color:#777">{{ label }}</span> -</div>{% else %}{% set bull = s.stoch_bias == "bull" %}{% set bear = s.stoch_bias == "bear" %}<div style="white-space:nowrap"><span style="color:#777">{{ label }}</span> <span style="color:{{ '#1e8e3e' if bull else '#c0392b' if bear else '#888' }};font-weight:700">{{ 'Bull' if bull else 'Bear' if bear else 'Flat' }}{% if s.stoch_cross == "up" %} ↑{% elif s.stoch_cross == "down" %} ↓{% endif %}</span> <span style="color:#777">K</span> {{ c(s.stoch_k, 80, 20) }} <span style="color:#777">/ D</span> {{ c(s.stoch_d, 80, 20) }}</div>{% endif %}{% endmacro %}
 <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:680px;margin:auto;color:#1a1a1a">
   <h2 style="margin-bottom:4px">📊 มูลค่าพอร์ตรวม</h2>
@@ -25,6 +26,13 @@ _TEMPLATE = Template("""\
       {{ '+' if totals.total_pl >= 0 else '' }}฿{{ "{:,.0f}".format(totals.total_pl) }}
       ({{ '+' if totals.total_pl >= 0 else '' }}{{ "%.1f"|format(totals.total_pl_pct) }}%) จากต้นทุน
     </div>
+    {% if changes and changes.d1.pct is not none %}
+    {% set d1baht = changes.d1.diff|round %}{# เครื่องหมายและสีตามยอดบาทที่แสดงจริง วันที่นิ่งสนิทจึงไม่เขียว #}
+    <div style="margin-top:6px;font-size:13px;color:#555">
+      วันนี้ <span style="font-weight:600;color:{{ '#1e8e3e' if d1baht > 0 else '#c0392b' if d1baht < 0 else '#888' }}">{{ '+' if d1baht > 0 else '-' if d1baht < 0 else '' }}฿{{ "{:,.0f}".format(changes.d1.diff|abs) }} ({{ fmt_pct(changes.d1.pct) }})</span>
+      · {{ chg("1W", changes.w1.pct) }} · {{ chg("1M", changes.m1.pct) }}
+    </div>
+    {% endif %}
     {% if failed %}
     <div style="margin-top:8px;color:#c0392b;font-size:12px;font-weight:600">
       ⚠️ ยอดรวมนี้ยังไม่รวม {{ failed|length }} ตัวที่ดึงข้อมูลไม่ได้ ({{ failed|join(", ") }})
@@ -48,7 +56,9 @@ _TEMPLATE = Template("""\
         <td style="padding:6px 4px;font-weight:600">{{ r.name or r.ticker }}
           {% if r.xd_days is not none %}<span style="background:#fff3cd;color:#856404;border-radius:4px;padding:1px 5px;font-size:11px">XD {{ r.xd_days }}d</span>{% endif %}
         </td>
-        <td style="padding:6px 4px;text-align:right">{{ "%.2f"|format(r.price) }} {{ r.currency }}</td>
+        <td style="padding:6px 4px;text-align:right;white-space:nowrap">{{ "%.2f"|format(r.price) }} {{ r.currency }}
+          {% if r.changes %}<div style="font-size:11px;margin-top:2px">{{ chg("1D", r.changes.d1) }} {{ chg("1W", r.changes.w1) }} {{ chg("1M", r.changes.m1) }}</div>{% endif %}
+        </td>
         <td style="padding:6px 4px;text-align:right;color:{{ '#1e8e3e' if r.pl >= 0 else '#c0392b' }}">
           {{ '+' if r.pl >= 0 else '' }}{{ "%.1f"|format(r.pl_pct) }}%
         </td>
@@ -80,8 +90,8 @@ _TEMPLATE = Template("""\
       <tr style="border-bottom:1px solid #f0f0f0">
         <td style="padding:5px 4px;font-weight:600">{{ r.ticker }}</td>
         <td style="padding:5px 4px;text-align:right">{{ "{:,.0f}".format(r.latest_volume) }} / {{ "{:,.0f}".format(r.avg_volume_20) }} ({{ "%.1f"|format(r.volume_ratio) }}x)</td>
-        <td style="padding:5px 4px;text-align:right;color:{{ '#1e8e3e' if r.price_change_pct is not none and r.price_change_pct >= 0 else '#c0392b' }}">
-          {{ '+' if r.price_change_pct is not none and r.price_change_pct >= 0 else '' }}{{ "%.1f"|format(r.price_change_pct) if r.price_change_pct is not none else "-" }}%
+        <td style="padding:5px 4px;text-align:right;color:{{ pct_color(r.price_change_pct) if r.price_change_pct is not none else '#888' }}">
+          {{ fmt_pct(r.price_change_pct) if r.price_change_pct is not none else "-" }}
         </td>
         <td style="padding:5px 4px;text-align:right">{{ "{:,.0f}".format(r.position_value) }} {{ r.currency }}</td>
       </tr>
@@ -175,12 +185,25 @@ def _act_color(action):
     return "#888"
 
 
+def _fmt_pct(v):
+    """ปัดเศษ % ที่จุดแสดงผลจุดเดียว — ปัด -0.04% แล้วได้ -0.0 ซึ่งต้องไม่ขึ้นเป็นลบในเมล"""
+    v = round(v, 1)
+    return f"{v:+.1f}%" if v else "0.0%"
+
+
+def _pct_color(v):
+    v = round(v, 1)  # ปัดก่อนเทียบ ไม่งั้น -0.04% ที่แสดงเป็น 0.0% จะโดนทาสีแดง
+    return "#1e8e3e" if v > 0 else "#c0392b" if v < 0 else "#888"
+
+
 _TEMPLATE.globals["act_color"] = _act_color
+_TEMPLATE.globals["fmt_pct"] = _fmt_pct
+_TEMPLATE.globals["pct_color"] = _pct_color
 
 
 def render(asof, totals, rows, failed, insider_rows=None, sec_failed=None, sec_period="",
-           high_volume_rows=None, xd_failed=None):
+           high_volume_rows=None, xd_failed=None, changes=None):
     return _TEMPLATE.render(asof=asof, totals=totals, rows=rows, failed=failed,
                             insider_rows=insider_rows or [], sec_failed=sec_failed or [],
                             sec_period=sec_period, high_volume_rows=high_volume_rows or [],
-                            xd_failed=xd_failed or [])
+                            xd_failed=xd_failed or [], changes=changes)

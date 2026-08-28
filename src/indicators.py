@@ -18,17 +18,43 @@ def high_volume_alert(ticker, df, shares, threshold=2.0, window=20):
     if avg_volume <= 0 or latest_volume / avg_volume < threshold:
         return None
 
-    closes = df["Close"].dropna()
-    price = float(closes.iloc[-1])
-    prev_price = float(closes.iloc[-2]) if len(closes) > 1 else None
-    price_change_pct = ((price - prev_price) / prev_price * 100) if prev_price else None
+    price = float(df["Close"].dropna().iloc[-1])  # มูลค่าถือครองใช้ราคาดิบ ไม่ใช่ราคา adjusted
     return {
         "ticker": ticker,
         "latest_volume": latest_volume,
         "avg_volume_20": avg_volume,
         "volume_ratio": round(latest_volume / avg_volume, 2),
-        "price_change_pct": round(price_change_pct, 1) if price_change_pct is not None else None,
+        "price_change_pct": price_changes(df)["d1"],
         "position_value": price * shares,
+    }
+
+
+def price_changes(df):
+    """% เปลี่ยนของราคาเทียบ 1 วัน / 1 สัปดาห์ / 1 เดือนก่อน — None ถ้าประวัติไม่พอ
+
+    ใช้ Adj Close เพราะวันขึ้น XD ราคาดิบตกเท่าเงินปันผล จะดูเหมือนหุ้นร่วงทั้งที่ไม่ได้ร่วง
+    1W/1M เทียบด้วยวันที่ (asof = แท่งล่าสุดที่ไม่เกินวันนั้น) ไม่ใช่นับถอยจำนวนแท่ง — วันหยุดยาว
+    ทำให้ iloc[-6] กลายเป็นช่วงที่ยาวกว่าหนึ่งสัปดาห์จริง
+    anchor คือแท่งล่าสุดใน df ไม่ใช่วันนี้ ข้อมูลค้างหนึ่งวันจึงยังเทียบถูกช่วง
+    """
+    s = (df["Adj Close"] if "Adj Close" in df else df["Close"]).dropna()
+    if len(s) < 2:
+        return {"d1": None, "w1": None, "m1": None}
+
+    latest = float(s.iloc[-1])
+    anchor = s.index[-1]
+
+    def pct(base):
+        if base is None or pd.isna(base) or float(base) <= 0:
+            return None
+        return (latest / float(base) - 1) * 100  # ไม่ปัดที่นี่ — pnl ใช้ค่านี้ย้อนหามูลค่าฐานต่อ
+
+    return {
+        "d1": pct(s.iloc[-2]),
+        # DateOffset ไม่ใช่ Timedelta — สัปดาห์ที่ตลาดเมกาปรับเวลา Timedelta(7d) = 168 ชม.จริง
+        # จะได้ 23:00 ของวันก่อนหน้า ทำให้ asof หลุดไปอีกแท่ง
+        "w1": pct(s.asof(anchor - pd.DateOffset(days=7))),
+        "m1": pct(s.asof(anchor - pd.DateOffset(months=1))),
     }
 
 

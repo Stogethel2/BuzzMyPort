@@ -66,6 +66,7 @@ def build(strict=False):
         price = float(df["Close"].dropna().iloc[-1])
         row = pnl.position_pnl(h, price)
         row["signals"] = indicators.compute_signals(df)
+        row["changes"] = indicators.price_changes(df)
         row["xd_days"] = None
         if not h.get("skip_xd"):
             try:
@@ -80,6 +81,7 @@ def build(strict=False):
             high_volume_rows.append(high_volume)
 
     totals = pnl.portfolio_totals(rows, usdthb)
+    changes = pnl.portfolio_changes(rows, usdthb)
 
     today = datetime.now(TZ).date()
     thai_symbols = [h["ticker"][:-3] for h in holdings if h["ticker"].endswith(".BK")]
@@ -88,7 +90,7 @@ def build(strict=False):
 
     asof = datetime.now(TZ).strftime("%d/%m/%Y %H:%M")
     html = report.render(asof, totals, rows, failed, insider_rows, sec_failed, sec_period,
-                         high_volume_rows, xd_failed)
+                         high_volume_rows, xd_failed, changes)
     alerts = []
     if failed or not totals["fx_ok"]:
         alerts.append("Partial")

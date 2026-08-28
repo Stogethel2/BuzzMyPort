@@ -68,7 +68,7 @@ def test_high_volume_alert_triggers_at_2x_avg20():
     assert alert["latest_volume"] == 200
     assert alert["avg_volume_20"] == 100
     assert alert["volume_ratio"] == 2.0
-    assert alert["price_change_pct"] == 10.0
+    assert alert["price_change_pct"] == pytest.approx(10.0)
     assert alert["position_value"] == 11000
 
 
@@ -142,3 +142,77 @@ def test_rsi_matches_wilder_definition_on_short_series():
     expected = 100 - 100 / (1 + avg_gain / avg_loss)
 
     assert indicators.rsi(closes).iloc[-1] == pytest.approx(expected)
+
+
+def _closes(pairs):
+    """pairs = [(วันที่, ราคา), ...] — index เว้นวันได้ เพื่อจำลองวันหยุด/วันไม่มีเทรด"""
+    dates = pd.to_datetime([d for d, _ in pairs])
+    prices = [p for _, p in pairs]
+    return pd.DataFrame({"Open": prices, "High": prices, "Low": prices,
+                         "Close": prices, "Adj Close": prices,
+                         "Volume": [100] * len(prices)}, index=dates)
+
+
+def test_price_changes_1d_uses_previous_bar():
+    df = _closes([("2026-01-01", 100), ("2026-01-02", 110)])
+
+    assert indicators.price_changes(df)["d1"] == pytest.approx(10.0)
+
+
+def test_price_changes_1w_skips_non_trading_days():
+    """anchor-7วัน ตรงกับวันหยุด — ต้องถอยไปแท่งล่าสุดที่มีจริง ไม่ใช่นับถอย 5 แท่ง"""
+    days = [("2026-01-%02d" % d, 100.0) for d in range(1, 21)]
+    days[-1] = ("2026-01-20", 50.0)  # แท่งสุดท้ายก่อนช่วงหยุดยาว 21-23
+    df = _closes(days + [("2026-01-24", 60.0), ("2026-01-30", 100.0)])
+
+    # anchor 30/01 - 7 วัน = 23/01 ไม่มีแท่ง -> ต้องใช้ 20/01 ที่ราคา 50
+    assert indicators.price_changes(df)["w1"] == pytest.approx(100.0)
+
+
+def test_price_changes_1m_uses_calendar_month():
+    df = _closes([("2026-01-15", 100.0), ("2026-02-01", 200.0), ("2026-03-01", 220.0)])
+
+    assert indicators.price_changes(df)["m1"] == pytest.approx(10.0)
+
+
+def test_price_changes_none_when_history_too_short():
+    df = _closes([("2026-03-01", 100.0), ("2026-03-02", 101.0)])
+
+    changes = indicators.price_changes(df)
+
+    assert changes["d1"] == pytest.approx(1.0)
+    assert changes["w1"] is None and changes["m1"] is None
+
+
+def test_price_changes_all_none_on_single_bar():
+    assert indicators.price_changes(_closes([("2026-03-02", 100.0)])) == {"d1": None, "w1": None, "m1": None}
+
+
+def test_price_changes_uses_adjusted_close_so_xd_is_not_a_fake_drop():
+    df = _closes([("2026-03-01", 100.0), ("2026-03-02", 100.0)])
+    df["Close"] = [100.0, 98.0]  # วันขึ้น XD ปันผล 2 บาท — ราคาดิบตก แต่ Adj Close เท่าเดิม
+
+    assert indicators.price_changes(df)["d1"] == 0.0
+
+
+def test_price_changes_keeps_full_precision_for_portfolio_math():
+    """pnl.portfolio_changes ย้อนหามูลค่าฐานจาก % นี้ — ปัดเศษที่นี่ทำให้ยอดรวมคลาดหลักร้อยบาท"""
+    df = _closes([("2026-03-01", 100.0), ("2026-03-02", 99.96)])
+
+    assert indicators.price_changes(df)["d1"] == pytest.approx(-0.04)
+
+
+def test_price_changes_handles_timezone_aware_index():
+    """ของจริงจาก yfinance เป็น tz-aware และตลาดเมกาข้ามเส้น DST ระหว่างทาง"""
+    df = _closes([("2026-10-15", 100.0), ("2026-11-14", 100.0), ("2026-11-15", 110.0)])
+    df.index = df.index.tz_localize("America/New_York")
+
+    assert indicators.price_changes(df)["m1"] == pytest.approx(10.0)
+
+
+def test_price_changes_1w_is_seven_calendar_days_across_spring_dst():
+    """ตลาดเมกาสัปดาห์ปรับเวลา: ลบ 168 ชม. จะได้ 03-02 23:00 EST แล้ว asof หลุดไปแท่ง 03-02"""
+    df = _closes([("2026-03-02", 50.0), ("2026-03-03", 100.0), ("2026-03-10", 110.0)])
+    df.index = df.index.tz_localize("America/New_York")
+
+    assert indicators.price_changes(df)["w1"] == pytest.approx(10.0)  # เทียบ 03-03 ไม่ใช่ 03-02
