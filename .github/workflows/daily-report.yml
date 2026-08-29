@@ -2,7 +2,7 @@ name: Daily Stock Report
 
 on:
   schedule:
-    - cron: "17 0 * * 2-6"   # 00:17 UTC = 07:17 ICT, อ-ส (รายงานวันถัดไปของแต่ละวันเทรด จ-ศ)
+    - cron: "5 1 * * 2-6"    # 01:05 UTC = 08:05 ICT, อ-ส (GitHub มักดีเลย์ 5-30 นาที จึงตกในช่วง 8-9 โมง)
   workflow_dispatch: {}        # ปุ่มรันมือทดสอบ
 
 jobs:
